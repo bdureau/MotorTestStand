@@ -51,13 +51,13 @@ const int LOADCELL_SCK_PIN = 3;
 //////////////////////////////////////////////////////////////////////
 
 HX711 scale;
-
+//#define LB2KG  0.45352
 //EEProm address
 logger_I2C_eeprom logger(0x50) ;
 // End address of the 512 eeprom
 long endAddress = 65536;
 // current file number that you are recording
-int currentFileNbr = 0;
+//int currentFileNbr = 0;
 // EEPROM start address for the flights. Anything before that is the flight index
 long currentMemaddress = 200;
 //stop recording a maximum of 20 seconds after main has fired
@@ -74,8 +74,6 @@ boolean motorStarted = false;
 unsigned long initialTime;
 boolean FastReading = false;
 
-
-//float FEET_IN_METER = 1;
 
 //telemetry
 boolean telemetryEnable = false;
@@ -106,9 +104,19 @@ void ResetGlobalVar() {
 void initTestStand() {
 
   ResetGlobalVar();
+//  calibration_factor= config.calibration_factor ;
+//  currentOffset = config.current_offset;
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.set_scale(2280.f);
-  scale.tare();
+  //scale.set_scale(2280.f);
+  float LB2KG  =0.45352;
+   config.calibration_factor = -33666;
+  config.current_offset= -64591;
+  scale.set_scale((float)config.calibration_factor / LB2KG);
+  //scale.set_scale(2280.f);
+  //scale.tare();
+  scale.set_offset( config.current_offset);
+  SerialCom.println(config.calibration_factor);
+  SerialCom.println(config.current_offset);
   SerialCom.println("Scale tared");
 }
 
@@ -117,7 +125,7 @@ void initTestStand() {
 */
 long ReadThrust() {
 
-  return  (long) scale.get_units();
+  return  (long) (abs(scale.get_units())*1000);
 }
 
 /*
@@ -208,7 +216,7 @@ void setup()
 
   if (lastThrustCurveNbr < 0)
   {
-    currentFileNbr = 0;
+    currentThrustCurveNbr = 0;
     currentMemaddress = 201;
   }
   else
@@ -288,7 +296,7 @@ void loop()
 void recordThrust()
 {
   ResetGlobalVar();
-
+telemetryEnable = true;
   while (!exitRecording)
   {
     //read current altitude
@@ -305,7 +313,7 @@ void recordThrust()
       if (canRecord)
       {
         //Save start address
-        logger.setThrustCurveStartAddress (currentFileNbr, currentMemaddress);
+        logger.setThrustCurveStartAddress (currentThrustCurveNbr, currentMemaddress);
 #ifdef SERIAL_DEBUG
         SerialCom.println(F("Save start address\n"));
 #endif
@@ -337,11 +345,12 @@ void recordThrust()
         if ( (currentMemaddress + logger.getSizeOfThrustCurveData())  > endAddress) {
           //flight is full let's save it
           //save end address
-          logger.setThrustCurveEndAddress (currentFileNbr, currentMemaddress - 1);
+          logger.setThrustCurveEndAddress (currentThrustCurveNbr, currentMemaddress - 1);
           canRecord = false;
         } else {
-          SerialCom.println("Recording..");
-          SerialCom.print(currentMemaddress);
+          //SerialCom.println("Recording..");
+          //SerialCom.print(currentMemaddress);
+          SendTelemetry(millis() - initialTime, 100);
           currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
           currentMemaddress++;
         }
@@ -354,16 +363,16 @@ void recordThrust()
         logger.setThrustCurveEndAddress (currentThrustCurveNbr, currentMemaddress - 1);
         logger.writeThrustCurveList();
         delay(50);
-        SerialCom.print("last: " );
+        /*SerialCom.print("last: " );
         SerialCom.println(currentMemaddress);
-        SerialCom.println(currentThrustCurveNbr);
+        SerialCom.println(currentThrustCurveNbr);*/
         exitRecording = true;
-        SendTelemetry(millis() - initialTime, 200);
+        SendTelemetry(millis() - initialTime, 100);
         recording = false;
-        SendTelemetry(millis() - initialTime, 200);
-        // we have landed telemetry is not required anymore
+        SendTelemetry(millis() - initialTime, 100);
+        // we have no more thrust telemetry is not required anymore
         telemetryEnable = false;
-        //resetThrustCurve();
+        resetThrustCurve();
       }
 
       /* if ((currThrust < 10)  || ( (millis() - initialTime) > recordingTimeOut))
@@ -408,8 +417,8 @@ void MainMenu()
       else
       {
         exitRecording = false;
-        //recordThrust();
-        SerialCom.println(currThrust);
+        recordThrust();
+        //SerialCom.println(currThrust);
       }
       long savedTime = millis();
       /*  while (!recording )
@@ -453,8 +462,9 @@ void MainMenu()
     }
   }
   interpretCommandBuffer(commandbuffer);
-  //SerialCom.print("command2:" );
-  //SerialCom.println(commandbuffer);
+  /*SerialCom.print("command2:" );
+  SerialCom.print(commandbuffer);
+   SerialCom.println("end");*/
 }
 
 
@@ -495,7 +505,7 @@ void interpretCommandBuffer(char *commandbuffer) {
     //i2c_eeprom_erase_fileList();
     logger.clearThrustCurveList();
     logger.writeThrustCurveList();
-    currentFileNbr = 0;
+    currentThrustCurveNbr = 0;
     currentMemaddress = 201;
   }
   //this will read one Thrust curve
@@ -548,7 +558,18 @@ void interpretCommandBuffer(char *commandbuffer) {
   //toggle continuity on and off
   else if (commandbuffer[0] == 'c')
   {
-    if (noContinuity == false)
+    char  temp[10];
+    int i=1;
+    while(commandbuffer[i] !='\0') {
+      temp[i]=commandbuffer[i];
+    }
+    temp[i]='\0';
+    //calibrate(float calibration_factor , float CALWEIGHT)
+    calibrate(-7050, (float)atof(temp));
+    writeConfigStruc();
+    SerialCom.print(F("$OK;\n"));
+    
+   /* if (noContinuity == false)
     {
       noContinuity = true;
       SerialCom.println(F("Continuity off \n"));
@@ -557,7 +578,7 @@ void interpretCommandBuffer(char *commandbuffer) {
     {
       noContinuity = false;
       SerialCom.println(F("Continuity on \n"));
-    }
+    }*/
   }
   //get all ThrustCurve data
   else if (commandbuffer[0] == 'a')
@@ -695,7 +716,7 @@ void resetThrustCurve() {
   else
   {
     currentMemaddress = logger.getThrustCurveStop(lastThrustCurveNbr) + 1;
-    currentFileNbr = lastThrustCurveNbr + 1;
+    currentThrustCurveNbr = lastThrustCurveNbr + 1;
   }
   canRecord = logger.CanRecord();
 }
@@ -725,5 +746,79 @@ void checkBatVoltage(float minVolt) {
     }
   }
 #endif
+
+}
+
+void calibrate(float calibration_factor , float CALWEIGHT) {
+  long currentOffset;
+  float LB2KG  =0.45352;
+  scale.set_scale(calibration_factor / LB2KG);
+  // set tare and save value
+    scale.tare();
+    currentOffset = scale.get_offset();
+    boolean done = false;
+    uint8_t flipDirCount = 0;
+    int8_t direction = 1;
+    uint8_t dirScale = 100;
+    double data = abs(scale.get_units());
+    double prevData = data;
+
+    while (!done)
+    {
+      // get data
+      data = abs(scale.get_units());
+      //Serial.println("data = " + String(data, 2));
+      //Serial.println("abs = " + String(abs(data - CALWEIGHT), 4));
+      //Serial.println("calibration_factor = " + String(calibration_factor));
+      // if not match
+      if (abs(data - CALWEIGHT) >= 0.01)
+      {
+        if (abs(data - CALWEIGHT) < abs(prevData - CALWEIGHT) && direction != 1 && data < CALWEIGHT)
+        {
+          direction = 1;
+          flipDirCount++;
+        }
+        else if (abs(data - CALWEIGHT) >= abs(prevData - CALWEIGHT) && direction != -1 && data > CALWEIGHT)
+        {
+          direction = -1;
+          flipDirCount++;
+        }
+
+        if (flipDirCount > 2)
+        {
+          if (dirScale != 1)
+          {
+            dirScale = dirScale / 10;
+            flipDirCount = 0;
+            //Serial.println("dirScale = " + String(dirScale));
+          }
+        }
+        // set new factor 
+        calibration_factor += direction * dirScale;
+        scale.set_scale(calibration_factor / LB2KG);
+       
+        //short delay
+        delay(5);
+        // keep old data 
+        prevData = data;
+      }
+      // if match
+      else
+      {
+        //Serial.println("NEW currentOffset = " + String(currentOffset));
+        //Serial.println("NEW calibration_factor = " + String(calibration_factor));
+        //EEPROM.put(0x00,0x01); // set init
+       // EEPROM.put(0x01,currentOffset);
+       // EEPROM.put(0x01+sizeof(long),calibration_factor);  
+       config.calibration_factor = (long) calibration_factor;
+       config.current_offset = currentOffset;
+       //writeConfigStruc();
+        done = true;
+        
+      }
+
+    } // end while
+
+    scale.set_offset(currentOffset);
 
 }

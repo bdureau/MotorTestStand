@@ -14,6 +14,8 @@ void defaultConfig()
   config.eepromSize = 512;
   config.startRecordThrust = 10;
   config.batteryType = 0;
+  config.calibration_factor = -33666; //-7050;
+  config.current_offset= -64591;
   config.cksum = CheckSumConf(config);
 }
 
@@ -79,6 +81,14 @@ bool writeTestStandConfig( char *p ) {
         strcat(msg, str);
         break;
       case 8:
+        config.calibration_factor = atoi(str);
+        strcat(msg, str);
+        break;
+      case 9:
+        config.current_offset = atoi(str);
+        strcat(msg, str);
+        break;
+      case 10:
         //our checksum
         strChk= atoi(str);
         break;
@@ -87,7 +97,7 @@ bool writeTestStandConfig( char *p ) {
 
   }
   //we have a partial config
-  if (i<7)
+  if (i<9)
     return false;
 
   if(msgChk(msg, sizeof(msg)) != strChk)
@@ -158,6 +168,12 @@ void printTestStandConfig()
   //Battery type
   sprintf(temp, "%i,", config.batteryType);
   strcat(testStandConfig, temp);
+
+  sprintf(temp, "%i,",config.calibration_factor);
+  strcat(testStandConfig, temp);
+  sprintf(temp, "%i,",config.current_offset);
+  strcat(testStandConfig, temp);
+  
   unsigned int chk = 0;
   chk = msgChk( testStandConfig, sizeof(testStandConfig) );
   sprintf(temp, "%i;\n", chk);

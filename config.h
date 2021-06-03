@@ -69,6 +69,8 @@ struct ConfigStruct {
   int eepromSize;
   int startRecordThrust; //start recording when minimum thrust
   int batteryType; // 0= Unknown, 1= "2S (7.4 Volts)", 2 = "9 Volts",3 = "3S (11.1 Volts)
+  long calibration_factor;
+  long current_offset;
   int cksum;  
 };
 extern ConfigStruct config;
