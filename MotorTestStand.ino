@@ -207,7 +207,7 @@ void setup()
   }
   initialThrust = (sum / 10.0);
   //lastAltitude = 0;
-  thrustDetect = 10; //config.startRecordThrust;//20;
+  thrustDetect =config.startRecordThrust;//20;
 
   int v_ret;
   v_ret = logger.readThrustCurveList();
@@ -354,15 +354,15 @@ telemetryEnable = true;
           currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
           currentMemaddress++;
         }
-        delay(50);
+        delay(10);
       }
 
-      if ((canRecord && (currThrust < 10) ) || ( (millis() - initialTime) > recordingTimeOut))
+      if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
       {
         //save end address
         logger.setThrustCurveEndAddress (currentThrustCurveNbr, currentMemaddress - 1);
         logger.writeThrustCurveList();
-        delay(50);
+        delay(10);
         /*SerialCom.print("last: " );
         SerialCom.println(currentMemaddress);
         SerialCom.println(currentThrustCurveNbr);*/
@@ -371,7 +371,7 @@ telemetryEnable = true;
         recording = false;
         SendTelemetry(millis() - initialTime, 100);
         // we have no more thrust telemetry is not required anymore
-        telemetryEnable = false;
+        //telemetryEnable = false;
         resetThrustCurve();
       }
 
@@ -421,8 +421,9 @@ void MainMenu()
         //SerialCom.println(currThrust);
       }
       long savedTime = millis();
-      /*  while (!recording )
+        while (!recording )
         {
+          SendTelemetry(0, 500);
           // check if we have anything on the serial port
           if (SerialCom.available())
           {
@@ -437,13 +438,13 @@ void MainMenu()
               commandbuffer[i++] = '\0';
               resetThrustCurve();
               interpretCommandBuffer(commandbuffer);
-              SerialCom.print("command1:" );
-               SerialCom.println( commandbuffer);
+              //SerialCom.print("command1:" );
+               //SerialCom.println( commandbuffer);
                //commandbuffer[0]='\0';
                i= 0;
             }
           }
-        }*/
+        }
     }
 
     while (SerialCom.available())
