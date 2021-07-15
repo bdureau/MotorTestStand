@@ -44,8 +44,16 @@
 
 
 // HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 2;
-const int LOADCELL_SCK_PIN = 3;
+#ifdef TESTSTAND
+const int LOADCELL_DOUT_PIN = 3;// 2;
+const int LOADCELL_SCK_PIN = 2; //3;
+#endif
+#ifdef TESTSTANDSTM32
+const int LOADCELL_DOUT_PIN = PB15;// 2;
+const int LOADCELL_SCK_PIN = PB14; //3;
+#endif
+/*#define DOUT  PB15
+#define CLK  PB14*/
 //////////////////////////////////////////////////////////////////////
 // Global variables
 //////////////////////////////////////////////////////////////////////
@@ -58,9 +66,9 @@ logger_I2C_eeprom logger(0x50) ;
 long endAddress = 65536;
 // current file number that you are recording
 //int currentFileNbr = 0;
-// EEPROM start address for the flights. Anything before that is the flight index
+// EEPROM start address for the thrust curve. Anything before that is the flight index
 long currentMemaddress = 200;
-//stop recording a maximum of 20 seconds after main has fired
+//stop recording a maximum of 20 seconds after the motor has fired
 long recordingTimeOut = 20000;
 boolean canRecord = true;
 boolean exitRecording = true;
@@ -73,8 +81,8 @@ long thrustDetect;
 boolean motorStarted = false;
 unsigned long initialTime;
 boolean FastReading = false;
-
-
+const int startPin =  PA1; 
+int startState = HIGH;
 //telemetry
 boolean telemetryEnable = false;
 long lastTelemetry = 0;
@@ -109,12 +117,12 @@ void initTestStand() {
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   //scale.set_scale(2280.f);
   float LB2KG  =0.45352;
-   config.calibration_factor = -33666;
-  config.current_offset= -64591;
+   config.calibration_factor = -29566;//-33666;
+  config.current_offset= 606978;//-64591;
   scale.set_scale((float)config.calibration_factor / LB2KG);
   //scale.set_scale(2280.f);
-  //scale.tare();
-  scale.set_offset( config.current_offset);
+  scale.tare();
+ // scale.set_offset( config.current_offset);
   SerialCom.println(config.calibration_factor);
   SerialCom.println(config.current_offset);
   SerialCom.println("Scale tared");
@@ -182,6 +190,7 @@ void setup()
   pinMode(PB11, INPUT_PULLUP);
 #endif
 
+pinMode(startPin, INPUT);
   SerialCom.print(F("Start program\n"));
   initTestStand();
   pinMode(pinSpeaker, OUTPUT);
@@ -192,7 +201,7 @@ void setup()
   //One long beep per major number and One short beep per minor revision
   //For example version 1.2 would be one long beep and 2 short beep
   beepTestStandVersion(MAJOR_VERSION, MINOR_VERSION);
-
+SerialCom.print("befor calman\n");
   // let's do some dummy altitude reading
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
@@ -206,9 +215,10 @@ void setup()
     delay(50);
   }
   initialThrust = (sum / 10.0);
-  //lastAltitude = 0;
+
   thrustDetect =config.startRecordThrust;//20;
 
+SerialCom.print(F("before read list\n"));
   int v_ret;
   v_ret = logger.readThrustCurveList();
 
@@ -229,6 +239,7 @@ void setup()
   canRecord = logger.CanRecord();
   if (!canRecord)
     SerialCom.println("Cannot record");
+    SerialCom.println("End init");
 }
 
 
@@ -299,10 +310,11 @@ void recordThrust()
 telemetryEnable = true;
   while (!exitRecording)
   {
-    //read current altitude
+    //read current thrust
     currThrust = (ReadThrust() - initialThrust);
 
-    if (( currThrust > config.startRecordThrust) && !recording )
+    //if (( currThrust > config.startRecordThrust) && !recording )
+    if ( !recording )
     {
       recording = true;
       SendTelemetry(0, 200);
@@ -325,6 +337,7 @@ telemetryEnable = true;
     // loop until we have reach a thrustof of x kg
     while (recording)
     {
+      //SerialCom.println(F("hello"));
       unsigned long currentTime;
       unsigned long diffTime;
 
@@ -357,7 +370,8 @@ telemetryEnable = true;
         delay(10);
       }
 
-      if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
+      //if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
+      if ( ( (millis() - initialTime) > recordingTimeOut))
       {
         //save end address
         logger.setThrustCurveEndAddress (currentThrustCurveNbr, currentMemaddress - 1);
@@ -371,7 +385,8 @@ telemetryEnable = true;
         recording = false;
         SendTelemetry(millis() - initialTime, 100);
         // we have no more thrust telemetry is not required anymore
-        //telemetryEnable = false;
+        telemetryEnable = false;
+        startState = HIGH;
         resetThrustCurve();
       }
 
@@ -383,7 +398,7 @@ telemetryEnable = true;
          // we have landed telemetry is not required anymore
          telemetryEnable = false;
         }*/
-    } // end while (liftoff)
+    } // end while (start recording)
   } //end while(recording)
 }
 
@@ -395,6 +410,7 @@ telemetryEnable = true;
 //================================================================
 void MainMenu()
 {
+  SerialCom.println(F("in main"));
   char readVal = ' ';
   int i = 0;
 
@@ -407,12 +423,17 @@ void MainMenu()
     if (!FastReading)
     {
       currThrust = (ReadThrust() - initialThrust);
+      //SerialCom.println(currThrust);
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
-      if (!( currThrust > thrustDetect) )
+      //= digitalRead(buttonPin); 
+      startState = digitalRead(startPin); 
+      //if (!( currThrust > thrustDetect) )
+      if(startState == HIGH)
       {
+        //SerialCom.println(F("hello1"));
         SendTelemetry(0, 500);
-        checkBatVoltage(BAT_MIN_VOLTAGE);
+       // checkBatVoltage(BAT_MIN_VOLTAGE);
       }
       else
       {
@@ -421,7 +442,7 @@ void MainMenu()
         //SerialCom.println(currThrust);
       }
       long savedTime = millis();
-        while (!recording )
+        /*while (!recording )
         {
           SendTelemetry(0, 500);
           // check if we have anything on the serial port
@@ -438,13 +459,14 @@ void MainMenu()
               commandbuffer[i++] = '\0';
               resetThrustCurve();
               interpretCommandBuffer(commandbuffer);
+             // SerialCom.println(F("helloé"));
               //SerialCom.print("command1:" );
                //SerialCom.println( commandbuffer);
                //commandbuffer[0]='\0';
                i= 0;
             }
           }
-        }
+        }*/
     }
 
     while (SerialCom.available())
@@ -562,11 +584,13 @@ void interpretCommandBuffer(char *commandbuffer) {
     char  temp[10];
     int i=1;
     while(commandbuffer[i] !='\0') {
-      temp[i]=commandbuffer[i];
+      temp[i-1]=commandbuffer[i];
+      i++;
     }
     temp[i]='\0';
+    //SerialCom.println(temp);
     //calibrate(float calibration_factor , float CALWEIGHT)
-    calibrate(-7050, (float)atof(temp));
+    calibrate(/*-7050*/-29566, (float)atof(temp));
     writeConfigStruc();
     SerialCom.print(F("$OK;\n"));
     
@@ -753,9 +777,11 @@ void checkBatVoltage(float minVolt) {
 void calibrate(float calibration_factor , float CALWEIGHT) {
   long currentOffset;
   float LB2KG  =0.45352;
+  //SerialCom.println("Calibrate");
+  //SerialCom.println(CALWEIGHT);
   scale.set_scale(calibration_factor / LB2KG);
   // set tare and save value
-    scale.tare();
+    //scale.tare();
     currentOffset = scale.get_offset();
     boolean done = false;
     uint8_t flipDirCount = 0;
@@ -768,9 +794,9 @@ void calibrate(float calibration_factor , float CALWEIGHT) {
     {
       // get data
       data = abs(scale.get_units());
-      //Serial.println("data = " + String(data, 2));
+      //SerialCom.println("data = " + String(data, 2));
       //Serial.println("abs = " + String(abs(data - CALWEIGHT), 4));
-      //Serial.println("calibration_factor = " + String(calibration_factor));
+      //SerialCom.println("calibration_factor = " + String(calibration_factor));
       // if not match
       if (abs(data - CALWEIGHT) >= 0.01)
       {

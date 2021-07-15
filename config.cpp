@@ -14,8 +14,8 @@ void defaultConfig()
   config.eepromSize = 512;
   config.startRecordThrust = 20;
   config.batteryType = 0;
-  config.calibration_factor = -33666; //-7050;
-  config.current_offset= -64591;
+  config.calibration_factor = -29566;//-33666; //-7050;
+  config.current_offset= 606978;//-64591;
   config.cksum = CheckSumConf(config);
 }
 

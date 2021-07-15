@@ -15,11 +15,11 @@
 /////////////// config changes start here ///////////
 // here choose one of the board that you want to use
 // note that you will need to compile using the Arduino Uno or SMT32 board
-#define TESTSTAND
+//#define TESTSTAND
 
 
 // if you have the STM32 shield then define TESTSTANDSTM32
-//#define TESTSTANDSTM32
+#define TESTSTANDSTM32
 
 
 #define BOARD_FIRMWARE "TestStand"
