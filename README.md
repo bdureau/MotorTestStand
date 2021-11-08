@@ -2,7 +2,7 @@
 Rocket motor datalogger firmware.
 Can do the following
 - Use any gauge sensor, it calibrate itself using a known weight
-- Trigger recording from your launch controleur
+- Trigger recording from your launch controler
 - Can record from 10 to 40 measures per second
 - Can record up to 25 thrust curves
 - Ability to set the recording time
