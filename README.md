@@ -14,3 +14,9 @@ Can do the following
 
 You will need to use the console front end to use your test stand
 https://github.com/bdureau/RocketMotorTestStandConsole
+
+The board look like this
+<img src="/board images/teststand_board.jpg" width="49%">   
+
+and the testStand can be something like this
+<img src="/board images/TestStand.jpg" width="49%">   
