@@ -7,6 +7,7 @@ Can do the following
 - Multi languages, so far can do French and English but can be translated in other languages 
 - Graphical front end using an Android device
 - Connect to Android using bluetooth or 3DR module to do long range telemetry
+- Ability to export to a csv file or a RASP file
 
 You will need to use the console front end to use your test stand
 https://github.com/bdureau/RocketMotorTestStandConsole
