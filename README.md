@@ -11,6 +11,8 @@ Can do the following
 - Graphical front end using an Android device
 - Connect to Android using bluetooth or 3DR module to do long range telemetry
 - Ability to export to a csv file or a RASP file
+- Ability to flash the firmware from your Android device
+- Application is available on the Android App store
 
 You will need to use the console front end to use your test stand
 https://github.com/bdureau/RocketMotorTestStandConsole
