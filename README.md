@@ -15,6 +15,8 @@ Can do the following
 - Application is available on the Android App store
 - On line help for each screen
 
+In addition it will allow you to configure any bluetooth or 3DR module using your Android app so that it can work with your board.
+
 You will need to use the console front end to use your test stand
 https://github.com/bdureau/RocketMotorTestStandConsole
 
@@ -25,3 +27,5 @@ The board look like this
 and the testStand can be something like this
 <p></p>
 <img src="/board images/TestStand.jpg" width="49%">   
+
+Note that I you are not a developper you can flash your board with this firmware using the Android app that you have installed from the App Store
