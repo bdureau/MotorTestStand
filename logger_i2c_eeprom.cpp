@@ -88,7 +88,29 @@ int logger_I2C_eeprom::getLastThrustCurveNbr()
 
 /*
 
-   getLastThrustCurveNbr()
+ eraseLastThrustCurve()
+ 
+ */
+bool logger_I2C_eeprom::eraseLastThrustCurve(){
+int i;
+  for (i = 0; i < 25; i++)
+  {
+    if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
+    {
+      if(i>0) {
+        _ThrustCurveConfig[i-1].ThrustCurve_start = 0;
+        _ThrustCurveConfig[i-1].ThrustCurve_stop = 0;
+        writeThrustCurveList();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/*
+
+   getLastThrustCurveEndAddress()
    Parse the ThrustCurve index end check if the ThrustCurve_start address is > 0
    return -1 if no ThrustCurve have been recorded else return the ThrustCurve number
 
@@ -169,7 +191,16 @@ long logger_I2C_eeprom::getThrustCurveData()
 {
   return _ThrustCurveData.thrust;
 }
-
+ #ifdef TESTSTANDSTM32V2
+long logger_I2C_eeprom::getPressureCurveData()
+{
+  return _ThrustCurveData.casing_pressure;
+}
+void logger_I2C_eeprom::setPressureCurveData( long pressure)
+{
+  _ThrustCurveData.casing_pressure = pressure;
+}
+#endif
 long logger_I2C_eeprom::getSizeOfThrustCurveData()
 {
   return sizeof(_ThrustCurveData);
@@ -201,7 +232,10 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       strcat(ThrustCurveData, temp);
       sprintf(temp, "%i,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
-     
+      #ifdef TESTSTANDSTM32V2
+      sprintf(temp, "%i,", getPressureCurveData() );
+      strcat(ThrustCurveData, temp);
+      #endif
       unsigned int chk = msgChk(ThrustCurveData, sizeof(ThrustCurveData));
       sprintf(temp, "%i", chk);
       strcat(ThrustCurveData, temp);

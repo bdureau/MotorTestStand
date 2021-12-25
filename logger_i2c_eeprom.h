@@ -19,6 +19,9 @@
 struct ThrustCurveDataStruct {
   long diffTime;
   long thrust;
+  #ifdef TESTSTANDSTM32V2
+  long casing_pressure;
+  #endif
 };
 struct ThrustCurveConfigStruct {
   long ThrustCurve_start;    
@@ -50,6 +53,7 @@ public:
     int readThrustCurveList();
     int writeThrustCurveList();
     int getLastThrustCurveNbr();
+    bool eraseLastThrustCurve();
     int printThrustCurveList();
     void setThrustCurveStartAddress(int ThrustCurveNbr, long startAddress);
     void setThrustCurveEndAddress(int ThrustCurveNbr, long endAddress);
@@ -57,9 +61,14 @@ public:
     long getThrustCurveTimeData();
     void setThrustCurveData( long thrust);
     long getThrustCurveData();
+    #ifdef TESTSTANDSTM32V2
+    long getPressureCurveData();
+    void setPressureCurveData( long pressure);
+    #endif
     long getThrustCurveStart(int ThrustCurveNbr);
     long getThrustCurveStop(int ThrustCurveNbr);
     void printThrustCurveData(int ThrustCurveNbr);
+
     boolean CanRecord();
     unsigned long writeFastThrustCurve(unsigned long eeaddress);
     long getSizeOfThrustCurveData();
