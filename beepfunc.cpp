@@ -16,7 +16,11 @@ const int pinSpeaker = PB4; //12;
 const int pinSpeaker = PA0;
 #endif
 
-int beepingFrequency;
+#ifdef TESTSTANDSTM32V2
+const int pinSpeaker = PA0;
+#endif
+
+int beepingFrequency =440;
 
 /*int lastPin = -1;
 int currentPinPos = 0;

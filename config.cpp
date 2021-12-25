@@ -9,13 +9,14 @@ void defaultConfig()
 {
   config.unit = 0;
   config.connectionSpeed = 38400;
-  config.endRecordThrust = 20; // stop recording 
-  config.standResolution = 0; //0 to 4 ie: from low resolution to high
+  config.endRecordTime = 10; // stop recording 
+  config.standResolution = 3; //0 to 3 ie: from low resolution to high
   config.eepromSize = 512;
-  config.startRecordThrust = 20;
-  config.batteryType = 0;
+  config.startRecordThrust = 10;
+  config.batteryType = 1;
   config.calibration_factor = -29566;//-33666; //-7050;
   config.current_offset= 606978;//-64591;
+  config.pressure_sensor_type = 0;
   config.cksum = CheckSumConf(config);
 }
 
@@ -61,7 +62,7 @@ bool writeTestStandConfig( char *p ) {
         strcat(msg, str);
         break;
       case 3:
-        config.endRecordThrust = atoi(str);
+        config.endRecordTime = atoi(str);
         strcat(msg, str);
         break;
       case 4:
@@ -89,6 +90,10 @@ bool writeTestStandConfig( char *p ) {
         strcat(msg, str);
         break;
       case 10:
+        config.pressure_sensor_type = atoi(str);
+        strcat(msg, str);
+        break;
+      case 11:
         //our checksum
         strChk= atoi(str);
         break;
@@ -97,7 +102,7 @@ bool writeTestStandConfig( char *p ) {
 
   }
   //we have a partial config
-  if (i<9)
+  if (i<10)
     return false;
 
   if(msgChk(msg, sizeof(msg)) != strChk)
@@ -156,7 +161,7 @@ void printTestStandConfig()
   sprintf(temp, "%i,", config.startRecordThrust);
   strcat(testStandConfig, temp);
   
-  sprintf(temp, "%i,", config.endRecordThrust);
+  sprintf(temp, "%i,", config.endRecordTime);
   strcat(testStandConfig, temp);
   
   sprintf(temp, "%i,", config.standResolution);
@@ -172,6 +177,9 @@ void printTestStandConfig()
   sprintf(temp, "%i,",config.calibration_factor);
   strcat(testStandConfig, temp);
   sprintf(temp, "%i,",config.current_offset);
+  strcat(testStandConfig, temp);
+
+  sprintf(temp, "%i,",config.pressure_sensor_type);
   strcat(testStandConfig, temp);
   
   unsigned int chk = 0;

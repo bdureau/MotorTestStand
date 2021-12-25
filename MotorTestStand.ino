@@ -1,5 +1,5 @@
 /*
-  Rocket Motor test stand ver 1.0
+  Rocket Motor test stand ver 1.1
   Copyright Boris du Reau 2012-2021
 
   The following is a datalogger for logging rocket motor thrustcurves.
@@ -29,6 +29,11 @@
 
   Major changes on version 1.0
   Initial version. This is based on my datalogger code and uses the same principles
+  Major Changes on version 1.1
+  Added connection test
+  Major Changes on version 1.2
+  Added casing pressure 
+  
 */
 
 //Test Stand configuration lib
@@ -48,12 +53,17 @@
 const int LOADCELL_DOUT_PIN = 3;// 2;
 const int LOADCELL_SCK_PIN = 2; //3;
 #endif
-#ifdef TESTSTANDSTM32
+#ifdef TESTSTANDSTM32 
+const int LOADCELL_DOUT_PIN = PB15;// 2;
+const int LOADCELL_SCK_PIN = PB14; //3;
+#endif
+
+#ifdef TESTSTANDSTM32V2
 const int LOADCELL_DOUT_PIN = PB15;// 2;
 const int LOADCELL_SCK_PIN = PB14; //3;
 #endif
 /*#define DOUT  PB15
-#define CLK  PB14*/
+  #define CLK  PB14*/
 //////////////////////////////////////////////////////////////////////
 // Global variables
 //////////////////////////////////////////////////////////////////////
@@ -74,6 +84,7 @@ boolean canRecord = true;
 boolean exitRecording = true;
 long currentThrustCurveNbr;
 long currentThrust;
+long currPressure;
 long currThrust = 0;
 long initialThrust;
 
@@ -81,7 +92,15 @@ long thrustDetect;
 boolean motorStarted = false;
 unsigned long initialTime;
 boolean FastReading = false;
-const int startPin =  PA1; 
+#ifdef TESTSTANDSTM32
+const int startPin =  PA1;
+#endif
+#ifdef TESTSTANDSTM32V2
+const int startPin =  PA1;
+#endif
+#ifdef TESTSTAND
+const int startPin =  10;
+#endif
 int startState = HIGH;
 //telemetry
 boolean telemetryEnable = false;
@@ -98,10 +117,8 @@ void MainMenu();
 
 */
 void ResetGlobalVar() {
-
   exitRecording = false;
   motorStarted = false;
-
 }
 
 /*
@@ -112,17 +129,23 @@ void ResetGlobalVar() {
 void initTestStand() {
 
   ResetGlobalVar();
-//  calibration_factor= config.calibration_factor ;
-//  currentOffset = config.current_offset;
+  //  calibration_factor= config.calibration_factor ;
+  //  currentOffset = config.current_offset;
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   //scale.set_scale(2280.f);
-  float LB2KG  =0.45352;
-   config.calibration_factor = -29566;//-33666;
-  config.current_offset= 606978;//-64591;
-  scale.set_scale((float)config.calibration_factor / LB2KG);
+  //float LB2KG  = 0.45352;
+  if (config.calibration_factor == 0)
+    config.calibration_factor = -29566;//-33666;
+  if(config.current_offset == 0)
+    config.current_offset = 606978; //-64591;
+  scale.tare();  
+  config.current_offset = scale.get_offset();
+  //scale.set_scale((float)config.calibration_factor / LB2KG);
+  scale.set_scale((float)config.calibration_factor );
   //scale.set_scale(2280.f);
-  scale.tare();
- // scale.set_offset( config.current_offset);
+  
+  
+  // scale.set_offset( config.current_offset);
   SerialCom.println(config.calibration_factor);
   SerialCom.println(config.current_offset);
   SerialCom.println("Scale tared");
@@ -133,7 +156,7 @@ void initTestStand() {
 */
 long ReadThrust() {
 
-  return  (long) (abs(scale.get_units())*1000);
+  return  (long) (abs(scale.get_units()) * 1000);
 }
 
 /*
@@ -159,6 +182,7 @@ void setup()
   {
     //default values
     defaultConfig();
+    //config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
 
@@ -166,6 +190,7 @@ void setup()
   if (!CheckValideBaudRate(config.connectionSpeed))
   {
     config.connectionSpeed = 38400;
+    config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
 
@@ -189,11 +214,14 @@ void setup()
 #ifdef TESTSTANDSTM32
   pinMode(PB11, INPUT_PULLUP);
 #endif
-
-pinMode(startPin, INPUT);
+#ifdef TESTSTANDSTM32V2
+  pinMode(PB11, INPUT_PULLUP);
+#endif
+  pinMode(startPin, INPUT);
   SerialCom.print(F("Start program\n"));
   initTestStand();
   pinMode(pinSpeaker, OUTPUT);
+
 
   digitalWrite(pinSpeaker, LOW);
 
@@ -201,7 +229,7 @@ pinMode(startPin, INPUT);
   //One long beep per major number and One short beep per minor revision
   //For example version 1.2 would be one long beep and 2 short beep
   beepTestStandVersion(MAJOR_VERSION, MINOR_VERSION);
-SerialCom.print("befor calman\n");
+  SerialCom.print("befor calman\n");
   // let's do some dummy altitude reading
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
@@ -216,9 +244,9 @@ SerialCom.print("befor calman\n");
   }
   initialThrust = (sum / 10.0);
 
-  thrustDetect =config.startRecordThrust;//20;
+  thrustDetect = config.startRecordThrust; //20;
 
-SerialCom.print(F("before read list\n"));
+  SerialCom.print(F("before read list\n"));
   int v_ret;
   v_ret = logger.readThrustCurveList();
 
@@ -237,9 +265,11 @@ SerialCom.print(F("before read list\n"));
 
   // check if eeprom is full
   canRecord = logger.CanRecord();
-  if (!canRecord)
+  if (!canRecord) {
     SerialCom.println("Cannot record");
-    SerialCom.println("End init");
+    beginBeepSeq();
+  }
+  SerialCom.println("End init");
 }
 
 
@@ -256,7 +286,6 @@ void SendTelemetry(long sampleTime, int freq) {
     lastTelemetry = millis();
     int val = 0;
 
-
     strcat(testStandTelem, "telemetry," );
     sprintf(temp, "%i,", currThrust);
     strcat(testStandTelem, temp);
@@ -272,7 +301,17 @@ void SendTelemetry(long sampleTime, int freq) {
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
-#else
+#endif 
+#ifdef TESTSTANDSTM32V2
+    pinMode(PB1, INPUT_ANALOG);
+    int batVoltage = analogRead(PB1);
+    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
+    //sprintf(temp, "%f,", bat);
+    dtostrf(bat, 4, 2, temp);
+    strcat(testStandTelem, temp);
+    strcat(testStandTelem, ",");
+#endif    
+#ifdef TESTSTAND
     strcat(testStandTelem, "-1,");
 #endif
 
@@ -307,7 +346,8 @@ void loop()
 void recordThrust()
 {
   ResetGlobalVar();
-telemetryEnable = true;
+  telemetryEnable = true;
+  recordingTimeOut = config.endRecordTime*1000;
   while (!exitRecording)
   {
     //read current thrust
@@ -333,16 +373,20 @@ telemetryEnable = true;
 
     }
     unsigned long prevTime = 0;
-    //long prevAltitude = 0;
+   
     // loop until we have reach a thrustof of x kg
     while (recording)
     {
-      //SerialCom.println(F("hello"));
       unsigned long currentTime;
       unsigned long diffTime;
 
       currThrust = (ReadThrust() - initialThrust);
+      #ifdef TESTSTANDSTM32V2
+      pinMode(PB0, INPUT_ANALOG);
+      int pressure = analogRead(PB0);
 
+      currPressure =(long) ( VOLT_DIVIDER * ((float)(pressure * 3300) / (float)4096000));
+      #endif
       currentTime = millis() - initialTime;
 
       SendTelemetry(currentTime, 200);
@@ -354,6 +398,9 @@ telemetryEnable = true;
       {
         logger.setThrustCurveTimeData( diffTime);
         logger.setThrustCurveData(currThrust);
+        #ifdef TESTSTANDSTM32V2
+        logger.setPressureCurveData(currPressure);
+        #endif
 
         if ( (currentMemaddress + logger.getSizeOfThrustCurveData())  > endAddress) {
           //flight is full let's save it
@@ -367,7 +414,15 @@ telemetryEnable = true;
           currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
           currentMemaddress++;
         }
-        delay(10);
+        
+        if (config.standResolution ==3)
+          delay(10);
+        else if (config.standResolution ==2)
+          delay(20);
+        else if (config.standResolution ==1)
+          delay(10);  
+        else if (config.standResolution ==0)
+          delay(40);    
       }
 
       //if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
@@ -378,8 +433,8 @@ telemetryEnable = true;
         logger.writeThrustCurveList();
         delay(10);
         /*SerialCom.print("last: " );
-        SerialCom.println(currentMemaddress);
-        SerialCom.println(currentThrustCurveNbr);*/
+          SerialCom.println(currentMemaddress);
+          SerialCom.println(currentThrustCurveNbr);*/
         exitRecording = true;
         SendTelemetry(millis() - initialTime, 100);
         recording = false;
@@ -390,14 +445,6 @@ telemetryEnable = true;
         resetThrustCurve();
       }
 
-      /* if ((currThrust < 10)  || ( (millis() - initialTime) > recordingTimeOut))
-        {
-
-         recording = false;
-         SendTelemetry(millis() - initialTime, 200);
-         // we have landed telemetry is not required anymore
-         telemetryEnable = false;
-        }*/
     } // end while (start recording)
   } //end while(recording)
 }
@@ -410,7 +457,7 @@ telemetryEnable = true;
 //================================================================
 void MainMenu()
 {
-  SerialCom.println(F("in main"));
+  //SerialCom.println(F("in main"));
   char readVal = ' ';
   int i = 0;
 
@@ -426,47 +473,22 @@ void MainMenu()
       //SerialCom.println(currThrust);
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
-      //= digitalRead(buttonPin); 
-      startState = digitalRead(startPin); 
-      //if (!( currThrust > thrustDetect) )
-      if(startState == HIGH)
+      //= digitalRead(buttonPin);
+      startState = digitalRead(startPin);
+      
+      if (startState == HIGH)
       {
-        //SerialCom.println(F("hello1"));
+        
         SendTelemetry(0, 500);
-       // checkBatVoltage(BAT_MIN_VOLTAGE);
+        checkBatVoltage(BAT_MIN_VOLTAGE);
       }
       else
       {
         exitRecording = false;
         recordThrust();
-        //SerialCom.println(currThrust);
       }
       long savedTime = millis();
-        /*while (!recording )
-        {
-          SendTelemetry(0, 500);
-          // check if we have anything on the serial port
-          if (SerialCom.available())
-          {
-            readVal = SerialCom.read();
-            if (readVal != ';' )
-            {
-              if (readVal != '\n')
-                commandbuffer[i++] = readVal;
-            }
-            else
-            {
-              commandbuffer[i++] = '\0';
-              resetThrustCurve();
-              interpretCommandBuffer(commandbuffer);
-             // SerialCom.println(F("helloé"));
-              //SerialCom.print("command1:" );
-               //SerialCom.println( commandbuffer);
-               //commandbuffer[0]='\0';
-               i= 0;
-            }
-          }
-        }*/
+
     }
 
     while (SerialCom.available())
@@ -485,9 +507,7 @@ void MainMenu()
     }
   }
   interpretCommandBuffer(commandbuffer);
-  /*SerialCom.print("command2:" );
-  SerialCom.print(commandbuffer);
-   SerialCom.println("end");*/
+ 
 }
 
 
@@ -518,6 +538,8 @@ void MainMenu()
       telemetry in on else turn it off
    m  followed by a number turn main loop on/off. if number is 1 then
       main loop in on else turn it off
+   x  delete last curve
+   j  tare the testStand
 */
 void interpretCommandBuffer(char *commandbuffer) {
   SerialCom.println((char*)commandbuffer);
@@ -535,10 +557,11 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'r')
   {
     char temp[3];
-    SerialCom.println(F("Read Thrust Curve: "));
-    SerialCom.println( commandbuffer[1]);
-    SerialCom.println( "\n");
+    //SerialCom.println(F("Read Thrust Curve: "));
+    //SerialCom.println( commandbuffer[1]);
+    //SerialCom.println( "\n");
     temp[0] = commandbuffer[1];
+    
     if (commandbuffer[2] != '\0')
     {
       temp[1] = commandbuffer[2];
@@ -549,11 +572,12 @@ void interpretCommandBuffer(char *commandbuffer) {
 
     if (atol(temp) > -1)
     {
-
-      SerialCom.println("StartThrustCurve;" );
+      SerialCom.print(F("$start;\n"));
+      //SerialCom.println("StartThrustCurve;" );
       //logger.PrintFlight(atoi(temp));
       logger.printThrustCurveData(atoi(temp));
-      SerialCom.println("EndThrustCurve;" );
+      //SerialCom.println("EndThrustCurve;" );
+      SerialCom.print(F("$end;\n"));
     }
     else
       SerialCom.println(F("not a valid ThrustCurve"));
@@ -567,10 +591,24 @@ void interpretCommandBuffer(char *commandbuffer) {
   //Number of ThrustCurve
   else if (commandbuffer[0] == 'n')
   {
-    SerialCom.println(F("Number of ThrustCurve \n"));
+    /*SerialCom.println(F("Number of ThrustCurve \n"));
     SerialCom.print(F("n;"));
     //Serial.println(getThrustCurveList());
-    logger.printThrustCurveList();
+    logger.printThrustCurveList();*/
+    //
+    char thrustCurveData[30] = "";
+    char temp[9] = "";
+    SerialCom.print(F("$start;\n"));
+    strcat(thrustCurveData, "nbrOfThrustCurve,");
+    sprintf(temp, "%i,", logger.getLastThrustCurveNbr()+1 );
+    strcat(thrustCurveData, temp);
+    unsigned int chk = msgChk(thrustCurveData, sizeof(thrustCurveData));
+    sprintf(temp, "%i", chk);
+    strcat(thrustCurveData, temp);
+    strcat(thrustCurveData, ";\n");
+    SerialCom.print("$");
+    SerialCom.print(thrustCurveData);
+    SerialCom.print(F("$end;\n"));
   }
   //list all ThrustCurve
   else if (commandbuffer[0] == 'l')
@@ -578,46 +616,52 @@ void interpretCommandBuffer(char *commandbuffer) {
     SerialCom.println(F("ThrustCurve List: \n"));
     logger.printThrustCurveList();
   }
-  //toggle continuity on and off
+  //calibrate
   else if (commandbuffer[0] == 'c')
   {
     char  temp[10];
-    int i=1;
-    while(commandbuffer[i] !='\0') {
-      temp[i-1]=commandbuffer[i];
+    int i = 1;
+    while (commandbuffer[i] != '\0') {
+      temp[i - 1] = commandbuffer[i];
       i++;
     }
-    temp[i]='\0';
+    temp[i] = '\0';
     //SerialCom.println(temp);
     //calibrate(float calibration_factor , float CALWEIGHT)
-    calibrate(/*-7050*/-29566, (float)atof(temp));
+    //calibrate(/*-7050*/ -29566, (float)atof(temp));
+    calibrate(config.calibration_factor, (float)atof(temp));
+    config.cksum = CheckSumConf(config);
     writeConfigStruc();
     SerialCom.print(F("$OK;\n"));
-    
-   /* if (noContinuity == false)
-    {
-      noContinuity = true;
-      SerialCom.println(F("Continuity off \n"));
-    }
-    else
-    {
-      noContinuity = false;
-      SerialCom.println(F("Continuity on \n"));
-    }*/
+
+    /* if (noContinuity == false)
+      {
+       noContinuity = true;
+       SerialCom.println(F("Continuity off \n"));
+      }
+      else
+      {
+       noContinuity = false;
+       SerialCom.println(F("Continuity on \n"));
+      }*/
   }
   //get all ThrustCurve data
   else if (commandbuffer[0] == 'a')
   {
+//    commandCancelled = false;
     SerialCom.print(F("$start;\n"));
 
     int i;
     ///todo
     for (i = 0; i < logger.getLastThrustCurveNbr() + 1; i++)
     {
+      //if(commandCancelled) 
+      //break;
       logger.printThrustCurveData(i);
     }
 
     SerialCom.print(F("$end;\n"));
+    //commandCancelled = false;
   }
   //get Test Stand config
   else if (commandbuffer[0] == 'b')
@@ -645,6 +689,7 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'd')
   {
     defaultConfig();
+    //config.cksum = CheckSumConf(config);
     writeConfigStruc();
     initTestStand();
   }
@@ -653,6 +698,7 @@ void interpretCommandBuffer(char *commandbuffer) {
   {
     //reset config
     defaultConfig();
+    //config.cksum = CheckSumConf(config);
     writeConfigStruc();
     initTestStand();
     SerialCom.print(F("config reseted\n"));
@@ -711,6 +757,24 @@ void interpretCommandBuffer(char *commandbuffer) {
       //mainLoopEnable = false;
     }
     SerialCom.print(F("$OK;\n"));
+  }
+  //delete last curve
+  else if (commandbuffer[0] == 'x')
+  {
+    logger.eraseLastThrustCurve();
+  }
+   //tare testStand
+  else if (commandbuffer[0] == 'j')
+  {
+    scale.tare();
+    SerialCom.print(F("$OK;\n"));
+  }
+  // send test tram
+  else if (commandbuffer[0] == 'o')
+  { 
+    SerialCom.print(F("$start;\n"));
+    sendTestTram();
+    SerialCom.print(F("$end;\n"));
   }
   // empty command
   else if (commandbuffer[0] == ' ')
@@ -772,80 +836,149 @@ void checkBatVoltage(float minVolt) {
   }
 #endif
 
+#ifdef TESTSTANDSTM32V2
+  if ((millis() - lastBattWarning) > 10000) {
+    lastBattWarning = millis();
+    pinMode(PB1, INPUT_ANALOG);
+    int batVoltage = analogRead(PB1);
+
+    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
+
+    if (bat < minVolt) {
+      for (int i = 0; i < 10; i++)
+      {
+        tone(pinSpeaker, 1600, 1000);
+        delay(50);
+        noTone(pinSpeaker);
+      }
+      delay(1000);
+    }
+  }
+#endif
+
 }
 
+/*
+ * Calibrate the test stand
+ */
 void calibrate(float calibration_factor , float CALWEIGHT) {
   long currentOffset;
-  float LB2KG  =0.45352;
+  float LB2KG  = 0.45352;
   //SerialCom.println("Calibrate");
   //SerialCom.println(CALWEIGHT);
-  scale.set_scale(calibration_factor / LB2KG);
+  //scale.set_scale(calibration_factor / LB2KG);
+  currentOffset = scale.get_offset();
+  scale.set_scale(calibration_factor );
   // set tare and save value
-    //scale.tare();
-    currentOffset = scale.get_offset();
-    boolean done = false;
-    uint8_t flipDirCount = 0;
-    int8_t direction = 1;
-    uint8_t dirScale = 100;
-    double data = abs(scale.get_units());
-    double prevData = data;
+  //scale.tare();
+  
+  SendCalibration(currentOffset, (long)calibration_factor, "Init");
+  boolean done = false;
+  uint8_t flipDirCount = 0;
+  int8_t direction = 1;
+  uint8_t dirScale = 100;
+  double data = abs(scale.get_units());
+  double prevData = data;
 
-    while (!done)
+  while (!done)
+  {
+    // get data
+    data = abs(scale.get_units());
+    //SerialCom.println("data = " + String(data, 2));
+    //Serial.println("abs = " + String(abs(data - CALWEIGHT), 4));
+    //SerialCom.println("calibration_factor = " + String(calibration_factor));
+    // if not match
+    if (abs(data - CALWEIGHT) >= 0.01)
     {
-      // get data
-      data = abs(scale.get_units());
-      //SerialCom.println("data = " + String(data, 2));
-      //Serial.println("abs = " + String(abs(data - CALWEIGHT), 4));
-      //SerialCom.println("calibration_factor = " + String(calibration_factor));
-      // if not match
-      if (abs(data - CALWEIGHT) >= 0.01)
+      if (abs(data - CALWEIGHT) < abs(prevData - CALWEIGHT) && direction != 1 && data < CALWEIGHT)
       {
-        if (abs(data - CALWEIGHT) < abs(prevData - CALWEIGHT) && direction != 1 && data < CALWEIGHT)
-        {
-          direction = 1;
-          flipDirCount++;
-        }
-        else if (abs(data - CALWEIGHT) >= abs(prevData - CALWEIGHT) && direction != -1 && data > CALWEIGHT)
-        {
-          direction = -1;
-          flipDirCount++;
-        }
-
-        if (flipDirCount > 2)
-        {
-          if (dirScale != 1)
-          {
-            dirScale = dirScale / 10;
-            flipDirCount = 0;
-            //Serial.println("dirScale = " + String(dirScale));
-          }
-        }
-        // set new factor 
-        calibration_factor += direction * dirScale;
-        scale.set_scale(calibration_factor / LB2KG);
-       
-        //short delay
-        delay(5);
-        // keep old data 
-        prevData = data;
+        direction = 1;
+        flipDirCount++;
       }
-      // if match
-      else
+      else if (abs(data - CALWEIGHT) >= abs(prevData - CALWEIGHT) && direction != -1 && data > CALWEIGHT)
       {
-        //Serial.println("NEW currentOffset = " + String(currentOffset));
-        //Serial.println("NEW calibration_factor = " + String(calibration_factor));
-        //EEPROM.put(0x00,0x01); // set init
-       // EEPROM.put(0x01,currentOffset);
-       // EEPROM.put(0x01+sizeof(long),calibration_factor);  
-       config.calibration_factor = (long) calibration_factor;
-       config.current_offset = currentOffset;
-       //writeConfigStruc();
-        done = true;
-        
+        direction = -1;
+        flipDirCount++;
       }
 
-    } // end while
+      if (flipDirCount > 2)
+      {
+        if (dirScale != 1)
+        {
+          dirScale = dirScale / 10;
+          flipDirCount = 0;
+          //Serial.println("dirScale = " + String(dirScale));
+        }
+      }
+      // set new factor
+      calibration_factor += direction * dirScale;
+      //scale.set_scale(calibration_factor / LB2KG);
+      scale.set_scale(calibration_factor);
+      SendCalibration(currentOffset, (long)calibration_factor, "In progress");
+      //short delay
+      delay(5);
+      // keep old data
+      prevData = data;
+    }
+    // if match
+    else
+    {
+      //Serial.println("NEW currentOffset = " + String(currentOffset));
+      //Serial.println("NEW calibration_factor = " + String(calibration_factor));
+      config.calibration_factor = (long) calibration_factor;
+      config.current_offset = currentOffset;
+      SendCalibration(currentOffset, (long)calibration_factor, "Done");
+      //writeConfigStruc();
+      done = true;
 
-    scale.set_offset(currentOffset);
+    }
+
+  } // end while
+
+  scale.set_offset(currentOffset);
+  scale.set_scale((float)config.calibration_factor);
+  SendCalibration(currentOffset, (long)calibration_factor, "Done");
+
+}
+
+void SendCalibration(long calibration_offset, long calibration_factor, char *flag) {
+  char testStandCalibration[50] = "";
+
+  char temp[10] = "";
+  
+  strcat(testStandCalibration, "calibration," );
+  sprintf(temp, "%i,", calibration_offset);
+  strcat(testStandCalibration, temp);
+  sprintf(temp, "%i,", calibration_factor);
+  strcat(testStandCalibration, temp);
+  strcat(testStandCalibration, flag);
+  strcat(testStandCalibration, ",");
+
+  unsigned int chk;
+  chk = msgChk(testStandCalibration, sizeof(testStandCalibration));
+  sprintf(temp, "%i", chk);
+  strcat(testStandCalibration, temp);
+  strcat(testStandCalibration, ";\n");
+  SerialCom.print("$");
+  SerialCom.print(testStandCalibration);
+}
+
+/*
+    Test tram
+*/
+void sendTestTram() {
+
+  char altiTest[100] = "";
+  char temp[10] = "";
+
+  strcat(altiTest, "testTrame," );
+  strcat(altiTest, "Bear altimeters are the best!!!!,");
+  unsigned int chk;
+  chk = msgChk(altiTest, sizeof(altiTest));
+  sprintf(temp, "%i", chk);
+  strcat(altiTest, temp);
+  strcat(altiTest, ";\n");
+  SerialCom.print("$");
+  SerialCom.print(altiTest);
 
 }
