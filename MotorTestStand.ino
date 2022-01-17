@@ -202,8 +202,10 @@ void setup()
   config.connectionSpeed = 38400;
   //SerialCom.begin(config.connectionSpeed);
   SerialCom.begin(38400);
-
-
+SerialCom.print("pressure_sensor_type" );
+SerialCom.println(config.pressure_sensor_type);
+SerialCom.print("connectionSpeed" );
+SerialCom.println(config.connectionSpeed);
   //  pinMode(A0, INPUT);
 #ifdef TESTSTAND
   //software pull up so that all bluetooth modules work!!! took me a good day to figure it out
@@ -320,6 +322,25 @@ void SendTelemetry(long sampleTime, int freq) {
     sprintf(temp, "%i,", logger.getLastThrustCurveNbr() + 1 );
     strcat(testStandTelem, temp);
 
+#ifdef TESTSTANDSTM32V2
+      pinMode(PA7, INPUT_ANALOG);
+      int pressure = analogRead(PA7);
+      
+      currPressure = map( ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE),
+                                  0.5,
+                                  4.5, 
+                                  0, 
+                                  pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+     //currPressure = (int)  100*  ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE);                             
+     sprintf(temp, "%i,", currPressure ); 
+     strcat(testStandTelem, temp);                            
+#endif
+#ifdef TESTSTAND
+    strcat(testStandTelem, "-1,");
+#endif
+#ifdef TESTSTANDSTM32
+    strcat(testStandTelem, "-1,");
+#endif
     unsigned int chk;
     chk = msgChk(testStandTelem, sizeof(testStandTelem));
     sprintf(temp, "%i", chk);
@@ -382,10 +403,14 @@ void recordThrust()
 
       currThrust = (ReadThrust() - initialThrust);
       #ifdef TESTSTANDSTM32V2
-      pinMode(PB0, INPUT_ANALOG);
-      int pressure = analogRead(PB0);
+      pinMode(PA7, INPUT_ANALOG);
+      int pressure = analogRead(PA7);
 
-      currPressure =(long) ( VOLT_DIVIDER * ((float)(pressure * 3300) / (float)4096000));
+      currPressure = map( ( VOLT_DIVIDER_PRESSURE * ((float)(pressure * 3300) / (float)4096000)),
+                                  0.5,
+                                  4.5, 
+                                  0, 
+                                  pressureSensorTypeToMaxValue(config.pressure_sensor_type));
       #endif
       currentTime = millis() - initialTime;
 
@@ -981,4 +1006,38 @@ void sendTestTram() {
   SerialCom.print("$");
   SerialCom.print(altiTest);
 
+}
+
+int pressureSensorTypeToMaxValue( int type){
+  //"100 PSI", "150 PSI", "200 PSI", "300 PSI", "500 PSI", "1000 PSI", "1600 PSI"
+int maxValue =100;
+  switch (type) 
+  {
+    case 0:
+      maxValue = 100;
+      break;
+    case 1:
+      maxValue = 100;
+      break;      
+    case 2:
+      maxValue = 150;
+      break;
+    case 3:
+      maxValue = 200;
+      break;   
+    case 4:
+      maxValue = 300;
+      break;   
+    case 5:
+      maxValue = 500;
+      break;   
+    case 6:
+      maxValue = 1000;
+      break;   
+    case 7:
+      maxValue = 1600;
+      break;                     
+  }
+
+  return maxValue;
 }

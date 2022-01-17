@@ -41,12 +41,13 @@
 #define R2 10
 
 #define VOLT_DIVIDER 10*(R1/(R1+R2))
+#define VOLT_DIVIDER_PRESSURE (R2/(R2+R1))
 
 ////////////// config changes end here /////////////
 //////////// do not change anything after unless you know what you are doing /////////////////////
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 1
+#define MINOR_VERSION 2
 #define BUILD 1
 #define CONFIG_START 32
 

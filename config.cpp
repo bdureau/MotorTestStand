@@ -16,7 +16,7 @@ void defaultConfig()
   config.batteryType = 1;
   config.calibration_factor = -29566;//-33666; //-7050;
   config.current_offset= 606978;//-64591;
-  config.pressure_sensor_type = 0;
+  config.pressure_sensor_type = 0; //"100 PSI", "150 PSI", "200 PSI", "300 PSI", "500 PSI", "1000 PSI", "1600 PSI"
   config.cksum = CheckSumConf(config);
 }
 
