@@ -32,8 +32,8 @@
   Major Changes on version 1.1
   Added connection test
   Major Changes on version 1.2
-  Added casing pressure 
-  
+  Added casing pressure
+
 */
 
 //Test Stand configuration lib
@@ -53,7 +53,7 @@
 const int LOADCELL_DOUT_PIN = 3;// 2;
 const int LOADCELL_SCK_PIN = 2; //3;
 #endif
-#ifdef TESTSTANDSTM32 
+#ifdef TESTSTANDSTM32
 const int LOADCELL_DOUT_PIN = PB15;// 2;
 const int LOADCELL_SCK_PIN = PB14; //3;
 #endif
@@ -136,15 +136,15 @@ void initTestStand() {
   //float LB2KG  = 0.45352;
   if (config.calibration_factor == 0)
     config.calibration_factor = -29566;//-33666;
-  if(config.current_offset == 0)
+  if (config.current_offset == 0)
     config.current_offset = 606978; //-64591;
-  scale.tare();  
+  scale.tare();
   config.current_offset = scale.get_offset();
   //scale.set_scale((float)config.calibration_factor / LB2KG);
   scale.set_scale((float)config.calibration_factor );
   //scale.set_scale(2280.f);
-  
-  
+
+
   // scale.set_offset( config.current_offset);
   SerialCom.println(config.calibration_factor);
   SerialCom.println(config.current_offset);
@@ -202,10 +202,10 @@ void setup()
   config.connectionSpeed = 38400;
   //SerialCom.begin(config.connectionSpeed);
   SerialCom.begin(38400);
-SerialCom.print("pressure_sensor_type" );
-SerialCom.println(config.pressure_sensor_type);
-SerialCom.print("connectionSpeed" );
-SerialCom.println(config.connectionSpeed);
+  SerialCom.print("pressure_sensor_type" );
+  SerialCom.println(config.pressure_sensor_type);
+  SerialCom.print("connectionSpeed" );
+  SerialCom.println(config.connectionSpeed);
   //  pinMode(A0, INPUT);
 #ifdef TESTSTAND
   //software pull up so that all bluetooth modules work!!! took me a good day to figure it out
@@ -303,7 +303,7 @@ void SendTelemetry(long sampleTime, int freq) {
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
-#endif 
+#endif
 #ifdef TESTSTANDSTM32V2
     pinMode(PB1, INPUT_ANALOG);
     int batVoltage = analogRead(PB1);
@@ -312,7 +312,7 @@ void SendTelemetry(long sampleTime, int freq) {
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
-#endif    
+#endif
 #ifdef TESTSTAND
     strcat(testStandTelem, "-1,");
 #endif
@@ -323,17 +323,17 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, temp);
 
 #ifdef TESTSTANDSTM32V2
-      pinMode(PA7, INPUT_ANALOG);
-      int pressure = analogRead(PA7);
-      
-      currPressure = map( ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE),
-                                  0.5,
-                                  4.5, 
-                                  0, 
-                                  pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-     //currPressure = (int)  100*  ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE);                             
-     sprintf(temp, "%i,", currPressure ); 
-     strcat(testStandTelem, temp);                            
+    pinMode(PA7, INPUT_ANALOG);
+    int pressure = analogRead(PA7);
+
+    currPressure = map( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
+                        0.5,
+                        4.5,
+                        0,
+                        pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+    //currPressure = (int)  100*  ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE);
+    sprintf(temp, "%i,", currPressure );
+    strcat(testStandTelem, temp);
 #endif
 #ifdef TESTSTAND
     strcat(testStandTelem, "-1,");
@@ -368,7 +368,7 @@ void recordThrust()
 {
   ResetGlobalVar();
   telemetryEnable = true;
-  recordingTimeOut = config.endRecordTime*1000;
+  recordingTimeOut = config.endRecordTime * 1000;
   while (!exitRecording)
   {
     //read current thrust
@@ -394,7 +394,7 @@ void recordThrust()
 
     }
     unsigned long prevTime = 0;
-   
+
     // loop until we have reach a thrustof of x kg
     while (recording)
     {
@@ -402,16 +402,16 @@ void recordThrust()
       unsigned long diffTime;
 
       currThrust = (ReadThrust() - initialThrust);
-      #ifdef TESTSTANDSTM32V2
+#ifdef TESTSTANDSTM32V2
       pinMode(PA7, INPUT_ANALOG);
       int pressure = analogRead(PA7);
 
       currPressure = map( ( VOLT_DIVIDER_PRESSURE * ((float)(pressure * 3300) / (float)4096000)),
-                                  0.5,
-                                  4.5, 
-                                  0, 
-                                  pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-      #endif
+                          0.5,
+                          4.5,
+                          0,
+                          pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+#endif
       currentTime = millis() - initialTime;
 
       SendTelemetry(currentTime, 200);
@@ -423,9 +423,9 @@ void recordThrust()
       {
         logger.setThrustCurveTimeData( diffTime);
         logger.setThrustCurveData(currThrust);
-        #ifdef TESTSTANDSTM32V2
+#ifdef TESTSTANDSTM32V2
         logger.setPressureCurveData(currPressure);
-        #endif
+#endif
 
         if ( (currentMemaddress + logger.getSizeOfThrustCurveData())  > endAddress) {
           //flight is full let's save it
@@ -439,15 +439,15 @@ void recordThrust()
           currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
           currentMemaddress++;
         }
-        
-        if (config.standResolution ==3)
+
+        if (config.standResolution == 3)
           delay(10);
-        else if (config.standResolution ==2)
+        else if (config.standResolution == 2)
           delay(20);
-        else if (config.standResolution ==1)
-          delay(10);  
-        else if (config.standResolution ==0)
-          delay(40);    
+        else if (config.standResolution == 1)
+          delay(10);
+        else if (config.standResolution == 0)
+          delay(40);
       }
 
       //if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
@@ -500,10 +500,10 @@ void MainMenu()
         SendTelemetry(millis() - initialTime, 200);
       //= digitalRead(buttonPin);
       startState = digitalRead(startPin);
-      
+
       if (startState == HIGH)
       {
-        
+
         SendTelemetry(0, 500);
         checkBatVoltage(BAT_MIN_VOLTAGE);
       }
@@ -532,7 +532,7 @@ void MainMenu()
     }
   }
   interpretCommandBuffer(commandbuffer);
- 
+
 }
 
 
@@ -542,104 +542,50 @@ void MainMenu()
    this is used by the Android console
 
    Commands are as folow:
-   e  erase all saved flights
-   r  followed by a number which is the flight number.
-      This will retrieve all data for the specified flight
-   w  Start or stop recording
-   n  Return the number of recorded flights in the EEprom
-   l  list all flights
-   c  toggle continuity on and off
-   a  get all flight data
+   a  get all thrustcurve data
    b  get altimeter config
-   s  write altimeter config
+   c  toggle continuity on and off
    d  reset alti config
-   t  reset alti config (why?)
+   e  erase all saved thrust curve
    f  FastReading on
    g  FastReading off
    h  hello. Does not do much
    i  unused
-   k  folowed by a number turn on or off the selected output
-   y  followed by a number turn telemetry on/off. if number is 1 then
-      telemetry in on else turn it off
+   j  tare the testStand
+   k  unused
+   l  list all thrust curves
    m  followed by a number turn main loop on/off. if number is 1 then
       main loop in on else turn it off
+   n  Return the number of recorded flights in the EEprom
+   r  followed by a number which is the flight number.
+      This will retrieve all data for the specified flight
+   s  write altimeter config
+   t  reset alti config (why?)
+   w  Start or stop recording
    x  delete last curve
-   j  tare the testStand
+   y  followed by a number turn telemetry on/off. if number is 1 then
+      telemetry in on else turn it off
 */
 void interpretCommandBuffer(char *commandbuffer) {
   SerialCom.println((char*)commandbuffer);
-  //this will erase all flight
-  if (commandbuffer[0] == 'e')
+  //get all ThrustCurve data
+  if (commandbuffer[0] == 'a')
   {
-    SerialCom.println(F("Erase\n"));
-    //i2c_eeprom_erase_fileList();
-    logger.clearThrustCurveList();
-    logger.writeThrustCurveList();
-    currentThrustCurveNbr = 0;
-    currentMemaddress = 201;
-  }
-  //this will read one Thrust curve
-  else if (commandbuffer[0] == 'r')
-  {
-    char temp[3];
-    //SerialCom.println(F("Read Thrust Curve: "));
-    //SerialCom.println( commandbuffer[1]);
-    //SerialCom.println( "\n");
-    temp[0] = commandbuffer[1];
-    
-    if (commandbuffer[2] != '\0')
-    {
-      temp[1] = commandbuffer[2];
-      temp[2] = '\0';
-    }
-    else
-      temp[1] = '\0';
-
-    if (atol(temp) > -1)
-    {
-      SerialCom.print(F("$start;\n"));
-      //SerialCom.println("StartThrustCurve;" );
-      //logger.PrintFlight(atoi(temp));
-      logger.printThrustCurveData(atoi(temp));
-      //SerialCom.println("EndThrustCurve;" );
-      SerialCom.print(F("$end;\n"));
-    }
-    else
-      SerialCom.println(F("not a valid ThrustCurve"));
-  }
-  // Recording
-  else if (commandbuffer[0] == 'w')
-  {
-    SerialCom.println(F("Recording \n"));
-    recordThrust();
-  }
-  //Number of ThrustCurve
-  else if (commandbuffer[0] == 'n')
-  {
-    /*SerialCom.println(F("Number of ThrustCurve \n"));
-    SerialCom.print(F("n;"));
-    //Serial.println(getThrustCurveList());
-    logger.printThrustCurveList();*/
-    //
-    char thrustCurveData[30] = "";
-    char temp[9] = "";
     SerialCom.print(F("$start;\n"));
-    strcat(thrustCurveData, "nbrOfThrustCurve,");
-    sprintf(temp, "%i,", logger.getLastThrustCurveNbr()+1 );
-    strcat(thrustCurveData, temp);
-    unsigned int chk = msgChk(thrustCurveData, sizeof(thrustCurveData));
-    sprintf(temp, "%i", chk);
-    strcat(thrustCurveData, temp);
-    strcat(thrustCurveData, ";\n");
-    SerialCom.print("$");
-    SerialCom.print(thrustCurveData);
+    int i;
+    ///todo
+    for (i = 0; i < logger.getLastThrustCurveNbr() + 1; i++)
+    {
+      logger.printThrustCurveData(i);
+    }
     SerialCom.print(F("$end;\n"));
   }
-  //list all ThrustCurve
-  else if (commandbuffer[0] == 'l')
+  //get Test Stand config
+  else if (commandbuffer[0] == 'b')
   {
-    SerialCom.println(F("ThrustCurve List: \n"));
-    logger.printThrustCurveList();
+    SerialCom.print(F("$start;\n"));
+    printTestStandConfig();
+    SerialCom.print(F("$end;\n"));
   }
   //calibrate
   else if (commandbuffer[0] == 'c')
@@ -651,89 +597,33 @@ void interpretCommandBuffer(char *commandbuffer) {
       i++;
     }
     temp[i] = '\0';
-    //SerialCom.println(temp);
-    //calibrate(float calibration_factor , float CALWEIGHT)
-    //calibrate(/*-7050*/ -29566, (float)atof(temp));
+
     calibrate(config.calibration_factor, (float)atof(temp));
     config.cksum = CheckSumConf(config);
     writeConfigStruc();
     SerialCom.print(F("$OK;\n"));
-
-    /* if (noContinuity == false)
-      {
-       noContinuity = true;
-       SerialCom.println(F("Continuity off \n"));
-      }
-      else
-      {
-       noContinuity = false;
-       SerialCom.println(F("Continuity on \n"));
-      }*/
-  }
-  //get all ThrustCurve data
-  else if (commandbuffer[0] == 'a')
-  {
-//    commandCancelled = false;
-    SerialCom.print(F("$start;\n"));
-
-    int i;
-    ///todo
-    for (i = 0; i < logger.getLastThrustCurveNbr() + 1; i++)
-    {
-      //if(commandCancelled) 
-      //break;
-      logger.printThrustCurveData(i);
-    }
-
-    SerialCom.print(F("$end;\n"));
-    //commandCancelled = false;
-  }
-  //get Test Stand config
-  else if (commandbuffer[0] == 'b')
-  {
-    SerialCom.print(F("$start;\n"));
-
-    printTestStandConfig();
-
-    SerialCom.print(F("$end;\n"));
-  }
-  //write test stand config
-  else if (commandbuffer[0] == 's')
-  {
-    if (writeTestStandConfig(commandbuffer)) {
-
-      SerialCom.print(F("$OK;\n"));
-      readTestStandConfig();
-      initTestStand();
-    }
-    else {
-      SerialCom.print(F("$KO;\n"));
-    }
   }
   //reset test stand config this is equal to t why do I have 2 !!!!
   else if (commandbuffer[0] == 'd')
   {
     defaultConfig();
-    //config.cksum = CheckSumConf(config);
     writeConfigStruc();
     initTestStand();
   }
-  //reset config and set it to default
-  else if (commandbuffer[0] == 't')
+  //this will erase all thrust curves
+  else if (commandbuffer[0] == 'e')
   {
-    //reset config
-    defaultConfig();
-    //config.cksum = CheckSumConf(config);
-    writeConfigStruc();
-    initTestStand();
-    SerialCom.print(F("config reseted\n"));
+    SerialCom.println(F("Erase\n"));
+    logger.clearThrustCurveList();
+    logger.writeThrustCurveList();
+    currentThrustCurveNbr = 0;
+    currentMemaddress = 201;
   }
   //FastReading
   else if (commandbuffer[0] == 'f')
   {
     FastReading = true;
     SerialCom.print(F("$OK;\n"));
-
   }
   //FastReading off
   else if (commandbuffer[0] == 'g')
@@ -752,19 +642,17 @@ void interpretCommandBuffer(char *commandbuffer) {
   {
     //exit continuity mode
   }
-
-  //telemetry on/off
-  else if (commandbuffer[0] == 'y')
+  //tare testStand
+  else if (commandbuffer[0] == 'j')
   {
-    if (commandbuffer[1] == '1') {
-      SerialCom.print(F("Telemetry enabled\n"));
-      telemetryEnable = true;
-    }
-    else {
-      SerialCom.print(F("Telemetry disabled\n"));
-      telemetryEnable = false;
-    }
+    scale.tare();
     SerialCom.print(F("$OK;\n"));
+  }
+  //list all ThrustCurve
+  else if (commandbuffer[0] == 'l')
+  {
+    SerialCom.println(F("ThrustCurve List: \n"));
+    logger.printThrustCurveList();
   }
   //mainloop on/off
   else if (commandbuffer[0] == 'm')
@@ -783,23 +671,114 @@ void interpretCommandBuffer(char *commandbuffer) {
     }
     SerialCom.print(F("$OK;\n"));
   }
+  //Number of ThrustCurve
+  else if (commandbuffer[0] == 'n')
+  {
+    char thrustCurveData[30] = "";
+    char temp[9] = "";
+    SerialCom.print(F("$start;\n"));
+    strcat(thrustCurveData, "nbrOfThrustCurve,");
+    sprintf(temp, "%i,", logger.getLastThrustCurveNbr() + 1 );
+    strcat(thrustCurveData, temp);
+    unsigned int chk = msgChk(thrustCurveData, sizeof(thrustCurveData));
+    sprintf(temp, "%i", chk);
+    strcat(thrustCurveData, temp);
+    strcat(thrustCurveData, ";\n");
+    SerialCom.print("$");
+    SerialCom.print(thrustCurveData);
+    SerialCom.print(F("$end;\n"));
+  }
+  // send test tram
+  else if (commandbuffer[0] == 'o')
+  {
+    SerialCom.print(F("$start;\n"));
+    sendTestTram();
+    SerialCom.print(F("$end;\n"));
+  }
+  //test stand config param
+  //write  config
+  else if (commandbuffer[0] == 'p')
+  {
+    if (writeTestStandConfigV2(commandbuffer)) {
+      SerialCom.print(F("$OK;\n"));
+    }
+    else
+      SerialCom.print(F("$KO;\n"));
+  }
+  else if (commandbuffer[0] == 'q')
+  {
+    writeConfigStruc();
+    readTestStandConfig();
+    initTestStand();
+    SerialCom.print(F("$OK;\n"));
+  }
+  //this will read one Thrust curve
+  else if (commandbuffer[0] == 'r')
+  {
+    char temp[3];
+    temp[0] = commandbuffer[1];
+
+    if (commandbuffer[2] != '\0')
+    {
+      temp[1] = commandbuffer[2];
+      temp[2] = '\0';
+    }
+    else
+      temp[1] = '\0';
+
+    if (atol(temp) > -1)
+    {
+      SerialCom.print(F("$start;\n"));
+      logger.printThrustCurveData(atoi(temp));
+      SerialCom.print(F("$end;\n"));
+    }
+    else
+      SerialCom.println(F("not a valid ThrustCurve"));
+  }
+  //write test stand config
+  else if (commandbuffer[0] == 's')
+  {
+    /* if (writeTestStandConfig(commandbuffer)) {
+       SerialCom.print(F("$OK;\n"));
+       readTestStandConfig();
+       initTestStand();
+      }
+      else {
+       SerialCom.print(F("$KO;\n"));
+      }*/
+  }
+  //reset config and set it to default
+  else if (commandbuffer[0] == 't')
+  {
+    //reset config
+    defaultConfig();
+    writeConfigStruc();
+    initTestStand();
+    SerialCom.print(F("config reseted\n"));
+  }
+  // Recording
+  else if (commandbuffer[0] == 'w')
+  {
+    SerialCom.println(F("Recording \n"));
+    recordThrust();
+  }
   //delete last curve
   else if (commandbuffer[0] == 'x')
   {
     logger.eraseLastThrustCurve();
   }
-   //tare testStand
-  else if (commandbuffer[0] == 'j')
+  //telemetry on/off
+  else if (commandbuffer[0] == 'y')
   {
-    scale.tare();
+    if (commandbuffer[1] == '1') {
+      SerialCom.print(F("Telemetry enabled\n"));
+      telemetryEnable = true;
+    }
+    else {
+      SerialCom.print(F("Telemetry disabled\n"));
+      telemetryEnable = false;
+    }
     SerialCom.print(F("$OK;\n"));
-  }
-  // send test tram
-  else if (commandbuffer[0] == 'o')
-  { 
-    SerialCom.print(F("$start;\n"));
-    sendTestTram();
-    SerialCom.print(F("$end;\n"));
   }
   // empty command
   else if (commandbuffer[0] == ' ')
@@ -884,8 +863,8 @@ void checkBatVoltage(float minVolt) {
 }
 
 /*
- * Calibrate the test stand
- */
+   Calibrate the test stand
+*/
 void calibrate(float calibration_factor , float CALWEIGHT) {
   long currentOffset;
   float LB2KG  = 0.45352;
@@ -896,7 +875,7 @@ void calibrate(float calibration_factor , float CALWEIGHT) {
   scale.set_scale(calibration_factor );
   // set tare and save value
   //scale.tare();
-  
+
   SendCalibration(currentOffset, (long)calibration_factor, "Init");
   boolean done = false;
   uint8_t flipDirCount = 0;
@@ -970,7 +949,7 @@ void SendCalibration(long calibration_offset, long calibration_factor, char *fla
   char testStandCalibration[50] = "";
 
   char temp[10] = "";
-  
+
   strcat(testStandCalibration, "calibration," );
   sprintf(temp, "%i,", calibration_offset);
   strcat(testStandCalibration, temp);
@@ -1008,35 +987,35 @@ void sendTestTram() {
 
 }
 
-int pressureSensorTypeToMaxValue( int type){
+int pressureSensorTypeToMaxValue( int type) {
   //"100 PSI", "150 PSI", "200 PSI", "300 PSI", "500 PSI", "1000 PSI", "1600 PSI"
-int maxValue =100;
-  switch (type) 
+  int maxValue = 100;
+  switch (type)
   {
     case 0:
       maxValue = 100;
       break;
     case 1:
       maxValue = 100;
-      break;      
+      break;
     case 2:
       maxValue = 150;
       break;
     case 3:
       maxValue = 200;
-      break;   
+      break;
     case 4:
       maxValue = 300;
-      break;   
+      break;
     case 5:
       maxValue = 500;
-      break;   
+      break;
     case 6:
       maxValue = 1000;
-      break;   
+      break;
     case 7:
       maxValue = 1600;
-      break;                     
+      break;
   }
 
   return maxValue;

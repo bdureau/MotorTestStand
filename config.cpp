@@ -31,9 +31,7 @@ bool readTestStandConfig() {
   if ( config.cksum != CheckSumConf(config) ) {
     return false;
   }
-
   return true;
-
 }
 
 
@@ -111,6 +109,79 @@ bool writeTestStandConfig( char *p ) {
   config.cksum = CheckSumConf(config);
 
   writeConfigStruc();
+  return true;
+}
+
+bool writeTestStandConfigV2( char *p ) {
+
+  char *str;
+  int i = 0;
+  int command =0;
+  long commandVal =0;
+  int strChk = 0;
+  char msg[100] = "";
+
+  while ((str = strtok_r(p, ",", &p)) != NULL) // delimiter is the comma
+  {
+    //SerialCom.println(str);
+    if (i == 1) {
+      command = atoi(str);
+      strcat(msg, str);
+    }
+    if (i == 2) {
+      commandVal =  atol(str);
+      strcat(msg, str);
+    }
+    if (i == 3) {
+      strChk  =  atoi(str);  
+    }
+    i++;
+
+  }
+    //we have a partial config
+  if (i < 4)
+    return false;
+  //checksum is ivalid ? 
+  if (msgChk(msg, sizeof(msg)) != strChk)
+    return false;  
+    
+  switch (command)
+    {
+      case 1:
+        config.unit = (int) commandVal;
+        break;
+      case 2:
+        config.connectionSpeed = commandVal;
+        break;
+      case 3:
+        config.endRecordTime = (int) commandVal;
+        break;
+      case 4:
+        config.standResolution = (int) commandVal;
+        break;
+      case 5:
+        config.eepromSize = (int) commandVal;
+        break;
+      case 6:
+        config.startRecordThrust = (int) commandVal;
+        break;
+      case 7:
+        config.batteryType = (int)commandVal;
+        break;
+      case 8:
+        config.calibration_factor = (int)commandVal;
+        break;
+      case 9:
+        config.current_offset = (int)commandVal;
+        break;
+      case 10:
+        config.pressure_sensor_type = (int)commandVal;
+        break;
+    }
+
+  // add checksum
+  config.cksum = CheckSumConf(config);
+
   return true;
 }
 /*

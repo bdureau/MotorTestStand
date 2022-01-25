@@ -17,9 +17,9 @@
 
 
 // if you have the STM32 shield then define TESTSTANDSTM32
-//#define TESTSTANDSTM32
+#define TESTSTANDSTM32
 
-#define TESTSTANDSTM32V2
+//#define TESTSTANDSTM32V2
 
 #ifdef TESTSTANDSTM32
 #define BOARD_FIRMWARE "TestStandSTM32"
@@ -95,7 +95,8 @@ extern ConfigStruct config;
 extern void defaultConfig();
 extern bool readTestStandConfig();
 extern int getOutPin(int );
-extern bool writeTestStandConfig( char * );
+//extern bool writeTestStandConfig( char * );
+extern bool writeTestStandConfigV2( char * );
 extern void printTestStandConfig();
 extern void writeConfigStruc();
 extern bool CheckValideBaudRate(long);
