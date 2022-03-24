@@ -35,9 +35,9 @@ void KalmanInit()
 
 }
 
-//KalmanCalc() - Calculates new Kalman values from float value "altitude"
-// This will be the ASL altitude during the flight, and the AGL altitude during dumps
-float KalmanCalc (float altitude)
+//KalmanCalc() - Calculates new Kalman values from float value "pressure"
+// This will be the ASL pressure during the thrust, and the AGL pressure during dumps
+float KalmanCalc (float pressure)
 {
 
   //Predict kalman_x_temp, kalman_p_temp
@@ -46,7 +46,7 @@ float KalmanCalc (float altitude)
 
   //Update kalman values
   kalman_k = (f_1/(kalman_p_temp + kalman_q)) * kalman_p_temp;
-  kalman_x = kalman_x_temp + (kalman_k * (altitude - kalman_x_temp));
+  kalman_x = kalman_x_temp + (kalman_k * (pressure - kalman_x_temp));
   kalman_p = (f_1 - kalman_k) * kalman_p_temp;
 
   //Save this state for next time

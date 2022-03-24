@@ -14,5 +14,5 @@ extern float kalman_p_temp;
 //end of Kalman Variables
 
 extern void KalmanInit();
-extern float KalmanCalc (float altitude);
+extern float KalmanCalc (float pressure);
 #endif

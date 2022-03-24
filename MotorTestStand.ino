@@ -39,31 +39,27 @@
 //Test Stand configuration lib
 #include "config.h"
 #include <Wire.h> //I2C library
-
 #include "kalman.h"
 #include "beepfunc.h"
-
 #include "logger_i2c_eeprom.h"
-
 #include "HX711.h"
 
 
 // HX711 circuit wiring
 #ifdef TESTSTAND
-const int LOADCELL_DOUT_PIN = 3;// 2;
-const int LOADCELL_SCK_PIN = 2; //3;
+const int LOADCELL_DOUT_PIN = 3;
+const int LOADCELL_SCK_PIN = 2;
 #endif
 #ifdef TESTSTANDSTM32
-const int LOADCELL_DOUT_PIN = PB15;// 2;
-const int LOADCELL_SCK_PIN = PB14; //3;
+const int LOADCELL_DOUT_PIN = PB15;
+const int LOADCELL_SCK_PIN = PB14; 
 #endif
 
 #ifdef TESTSTANDSTM32V2
-const int LOADCELL_DOUT_PIN = PB15;// 2;
-const int LOADCELL_SCK_PIN = PB14; //3;
+const int LOADCELL_DOUT_PIN = PB15;
+const int LOADCELL_SCK_PIN = PB14;
 #endif
-/*#define DOUT  PB15
-  #define CLK  PB14*/
+
 //////////////////////////////////////////////////////////////////////
 // Global variables
 //////////////////////////////////////////////////////////////////////
@@ -84,7 +80,7 @@ boolean canRecord = true;
 boolean exitRecording = true;
 long currentThrustCurveNbr;
 long currentThrust;
-long currPressure;
+//long currPressure;
 long currThrust = 0;
 long initialThrust;
 
@@ -109,7 +105,13 @@ long lastBattWarning = 0;
 boolean recording = false;
 
 void MainMenu();
-
+/*
+ * Float replacement of the map function
+ */
+float map_tofloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 /*
 
@@ -155,8 +157,31 @@ void initTestStand() {
    ReadThrust()
 */
 long ReadThrust() {
-
   return  (long) (abs(scale.get_units()) * 1000);
+}
+
+long ReadPressure() {
+
+   float sum = 0;
+  for (int i = 0; i < 50; i++) {
+    
+  
+   int pressure = analogRead(PA7);
+
+   sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
+                        0.5,
+                        4.5,
+                        0.0,
+                        (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+   /*sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)1023000 / VOLT_DIVIDER_PRESSURE),
+                        0.5,
+                        4.5,
+                        0.0,
+                        (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));*/
+                      
+    delay(1);
+  }
+  return (long)  (sum/50.0);
 }
 
 /*
@@ -166,12 +191,9 @@ long ReadThrust() {
 */
 void setup()
 {
-  int val = 0;     // variable to store the read value
-  int val1 = 0;     // variable to store the read value
   // initialise the connection
   Wire.begin();
-  //Serial.begin(38400);
-  //Serial.print(F("Start program\n"));
+  
   //soft configuration
   boolean softConfigValid = false;
   // Read test stand softcoded configuration
@@ -193,7 +215,10 @@ void setup()
     config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
-
+  analogReadResolution(12); 
+#ifdef TESTSTANDSTM32V2
+    pinMode(PA7, INPUT_ANALOG);
+#endif    
   // init Kalman filter
   KalmanInit();
 
@@ -224,18 +249,18 @@ void setup()
   initTestStand();
   pinMode(pinSpeaker, OUTPUT);
 
-
   digitalWrite(pinSpeaker, LOW);
 
   //initialisation give the version of the testStand
   //One long beep per major number and One short beep per minor revision
   //For example version 1.2 would be one long beep and 2 short beep
   beepTestStandVersion(MAJOR_VERSION, MINOR_VERSION);
-  SerialCom.print("befor calman\n");
-  // let's do some dummy altitude reading
+  SerialCom.print("before calman\n");
+  // let's do some dummy pressure reading
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
-    ReadThrust();
+   // ReadThrust();
+   ReadPressure();
   }
 
   //let's read the testStand 0
@@ -299,7 +324,6 @@ void SendTelemetry(long sampleTime, int freq) {
     pinMode(PB1, INPUT_ANALOG);
     int batVoltage = analogRead(PB1);
     float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
-    //sprintf(temp, "%f,", bat);
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
@@ -308,7 +332,6 @@ void SendTelemetry(long sampleTime, int freq) {
     pinMode(PB1, INPUT_ANALOG);
     int batVoltage = analogRead(PB1);
     float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
-    //sprintf(temp, "%f,", bat);
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
@@ -323,15 +346,8 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, temp);
 
 #ifdef TESTSTANDSTM32V2
-    pinMode(PA7, INPUT_ANALOG);
-    int pressure = analogRead(PA7);
-
-    currPressure = map( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
-                        0.5,
-                        4.5,
-                        0,
-                        pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-    //currPressure = (int)  100*  ((float)(pressure * 3300) / (float)4096000 /VOLT_DIVIDER_PRESSURE);
+    long currPressure = ReadPressure();
+    
     sprintf(temp, "%i,", currPressure );
     strcat(testStandTelem, temp);
 #endif
@@ -400,17 +416,11 @@ void recordThrust()
     {
       unsigned long currentTime;
       unsigned long diffTime;
+      long currPressure;
 
       currThrust = (ReadThrust() - initialThrust);
 #ifdef TESTSTANDSTM32V2
-      pinMode(PA7, INPUT_ANALOG);
-      int pressure = analogRead(PA7);
-
-      currPressure = map( ( VOLT_DIVIDER_PRESSURE * ((float)(pressure * 3300) / (float)4096000)),
-                          0.5,
-                          4.5,
-                          0,
-                          pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+      currPressure = ReadPressure();
 #endif
       currentTime = millis() - initialTime;
 
@@ -428,7 +438,7 @@ void recordThrust()
 #endif
 
         if ( (currentMemaddress + logger.getSizeOfThrustCurveData())  > endAddress) {
-          //flight is full let's save it
+          //memory is full let's save it
           //save end address
           logger.setThrustCurveEndAddress (currentThrustCurveNbr, currentMemaddress - 1);
           canRecord = false;
@@ -445,7 +455,7 @@ void recordThrust()
         else if (config.standResolution == 2)
           delay(20);
         else if (config.standResolution == 1)
-          delay(10);
+          delay(30);
         else if (config.standResolution == 0)
           delay(40);
       }
@@ -503,7 +513,6 @@ void MainMenu()
 
       if (startState == HIGH)
       {
-
         SendTelemetry(0, 500);
         checkBatVoltage(BAT_MIN_VOLTAGE);
       }
@@ -512,7 +521,7 @@ void MainMenu()
         exitRecording = false;
         recordThrust();
       }
-      long savedTime = millis();
+      //long savedTime = millis();
 
     }
 

@@ -229,8 +229,10 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       sprintf(temp, "%i,", ThrustCurveNbr );
       strcat(ThrustCurveData, temp);
       sprintf(temp, "%i,", currentTime );
+      //sprintf(temp, "%lu,", currentTime );
       strcat(ThrustCurveData, temp);
       sprintf(temp, "%i,", getThrustCurveData() );
+      //sprintf(temp, "%lu,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
       #ifdef TESTSTANDSTM32V2
       sprintf(temp, "%i,", getPressureCurveData() );
