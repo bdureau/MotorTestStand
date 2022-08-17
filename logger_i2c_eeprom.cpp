@@ -223,19 +223,19 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
     {
       i = readThrustCurve(i) + 1;
       char ThrustCurveData[120] = "";
-      char temp[9] = "";
+      char temp[20] = "";
       currentTime = currentTime + getThrustCurveTimeData();
       strcat(ThrustCurveData, "data,");
       sprintf(temp, "%i,", ThrustCurveNbr );
       strcat(ThrustCurveData, temp);
-      sprintf(temp, "%i,", currentTime );
+      sprintf(temp, "%i,", (int) currentTime );
       //sprintf(temp, "%lu,", currentTime );
       strcat(ThrustCurveData, temp);
-      sprintf(temp, "%i,", getThrustCurveData() );
+      sprintf(temp, "%i,", (int)getThrustCurveData() );
       //sprintf(temp, "%lu,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
       #ifdef TESTSTANDSTM32V2
-      sprintf(temp, "%i,", getPressureCurveData() );
+      sprintf(temp, "%i,", (int)getPressureCurveData() );
       strcat(ThrustCurveData, temp);
       #endif
       unsigned int chk = msgChk(ThrustCurveData, sizeof(ThrustCurveData));

@@ -1,6 +1,6 @@
 /*
-  Rocket Motor test stand ver 1.1
-  Copyright Boris du Reau 2012-2021
+  Rocket Motor test stand ver 1.2
+  Copyright Boris du Reau 2012-2022
 
   The following is a datalogger for logging rocket motor thrustcurves.
 
@@ -52,7 +52,7 @@ const int LOADCELL_SCK_PIN = 2;
 #endif
 #ifdef TESTSTANDSTM32
 const int LOADCELL_DOUT_PIN = PB15;
-const int LOADCELL_SCK_PIN = PB14; 
+const int LOADCELL_SCK_PIN = PB14;
 #endif
 
 #ifdef TESTSTANDSTM32V2
@@ -84,7 +84,7 @@ long currentThrust;
 long currThrust = 0;
 long initialThrust;
 
-long thrustDetect;
+//long thrustDetect;
 boolean motorStarted = false;
 unsigned long initialTime;
 boolean FastReading = false;
@@ -106,8 +106,8 @@ boolean recording = false;
 
 void MainMenu();
 /*
- * Float replacement of the map function
- */
+   Float replacement of the map function
+*/
 float map_tofloat(float x, float in_min, float in_max, float out_min, float out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -162,26 +162,26 @@ long ReadThrust() {
 
 long ReadPressure() {
 
-   float sum = 0;
-  for (int i = 0; i < 50; i++) {
-    
-  
-   int pressure = analogRead(PA7);
+  float sum = 0;
+  for (int i = 0; i < 40; i++) {
 
-   sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
-                        0.5,
-                        4.5,
-                        0.0,
-                        (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-   /*sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)1023000 / VOLT_DIVIDER_PRESSURE),
-                        0.5,
-                        4.5,
-                        0.0,
-                        (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));*/
-                      
+
+    int pressure = analogRead(PA7);
+
+    sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
+                               0.5,
+                               4.5,
+                               0.0,
+                               (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+    /*sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)1023000 / VOLT_DIVIDER_PRESSURE),
+                         0.5,
+                         4.5,
+                         0.0,
+                         (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));*/
+
     delay(1);
   }
-  return (long)  (sum/50.0);
+  return (long)  (sum / 40.0);
 }
 
 /*
@@ -193,7 +193,7 @@ void setup()
 {
   // initialise the connection
   Wire.begin();
-  
+
   //soft configuration
   boolean softConfigValid = false;
   // Read test stand softcoded configuration
@@ -215,10 +215,10 @@ void setup()
     config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
-  analogReadResolution(12); 
+  analogReadResolution(12);
 #ifdef TESTSTANDSTM32V2
-    pinMode(PA7, INPUT_ANALOG);
-#endif    
+  pinMode(PA7, INPUT_ANALOG);
+#endif
   // init Kalman filter
   KalmanInit();
 
@@ -259,8 +259,8 @@ void setup()
   // let's do some dummy pressure reading
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
-   // ReadThrust();
-   ReadPressure();
+    // ReadThrust();
+    ReadPressure();
   }
 
   //let's read the testStand 0
@@ -271,7 +271,7 @@ void setup()
   }
   initialThrust = (sum / 10.0);
 
-  thrustDetect = config.startRecordThrust; //20;
+  // thrustDetect = config.startRecordThrust; //20;
 
   SerialCom.print(F("before read list\n"));
   int v_ret;
@@ -347,7 +347,7 @@ void SendTelemetry(long sampleTime, int freq) {
 
 #ifdef TESTSTANDSTM32V2
     long currPressure = ReadPressure();
-    
+
     sprintf(temp, "%i,", currPressure );
     strcat(testStandTelem, temp);
 #endif
@@ -419,8 +419,12 @@ void recordThrust()
       long currPressure;
 
       currThrust = (ReadThrust() - initialThrust);
+      if (currThrust < 0)
+        currThrust = 0;
 #ifdef TESTSTANDSTM32V2
       currPressure = ReadPressure();
+      if (currPressure < 0)
+        currPressure = 0;
 #endif
       currentTime = millis() - initialTime;
 
@@ -446,10 +450,13 @@ void recordThrust()
           //SerialCom.println("Recording..");
           //SerialCom.print(currentMemaddress);
           SendTelemetry(millis() - initialTime, 100);
-          currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
-          currentMemaddress++;
-        }
 
+          if (currThrust < 100000) {
+            currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
+            currentMemaddress++;
+          }
+        }
+#ifdef TESTSTANDSTM32
         if (config.standResolution == 3)
           delay(10);
         else if (config.standResolution == 2)
@@ -458,6 +465,27 @@ void recordThrust()
           delay(30);
         else if (config.standResolution == 0)
           delay(40);
+#endif
+#ifdef TESTSTAND
+        if (config.standResolution == 3)
+          delay(10);
+        else if (config.standResolution == 2)
+          delay(20);
+        else if (config.standResolution == 1)
+          delay(30);
+        else if (config.standResolution == 0)
+          delay(40);
+#endif
+#ifdef TESTSTANDSTM32V2
+        if (config.standResolution == 3)
+          delay(5);
+        else if (config.standResolution == 2)
+          delay(15);
+        else if (config.standResolution == 1)
+          delay(25);
+        else if (config.standResolution == 0)
+          delay(35);
+#endif
       }
 
       //if ((canRecord && (currThrust < config.endRecordThrust) ) || ( (millis() - initialTime) > recordingTimeOut))
@@ -720,6 +748,7 @@ void interpretCommandBuffer(char *commandbuffer) {
     readTestStandConfig();
     initTestStand();
     SerialCom.print(F("$OK;\n"));
+    
   }
   //this will read one Thrust curve
   else if (commandbuffer[0] == 'r')
@@ -775,6 +804,19 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'x')
   {
     logger.eraseLastThrustCurve();
+    logger.readThrustCurveList();
+    long lastThrustCurveNbr = logger.getLastThrustCurveNbr();
+    if (lastThrustCurveNbr < 0)
+    {
+      currentThrustCurveNbr = 0;
+      currentMemaddress = 201;
+    }
+    else
+    {
+      currentMemaddress = logger.getThrustCurveStop(lastThrustCurveNbr) + 1;
+      currentThrustCurveNbr = lastThrustCurveNbr + 1;
+    }
+    canRecord = logger.CanRecord();
   }
   //telemetry on/off
   else if (commandbuffer[0] == 'y')
