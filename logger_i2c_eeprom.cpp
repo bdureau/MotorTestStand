@@ -272,3 +272,78 @@ boolean logger_I2C_eeprom::CanRecord()
   }
   return true;
 }
+
+// this is to check your eeprom byte by byte. This will take approx 11 minutes for a 512 eeprom
+long logger_I2C_eeprom::checkMemoryErrors(long memoryLastAddress) {
+  long errors = 0;
+  for (long i = 0; i < memoryLastAddress; i++)
+  {
+    //read byte and save it
+    byte currentByte;
+    eep.read(i, ((byte*)&currentByte), sizeof(byte));
+    
+    //write byte 
+    byte bToWrite = ~currentByte; 
+    eep.write(i, ((byte*)&bToWrite), sizeof(currentByte));
+    delay(5);
+    //check if value is the same
+    byte myByte;
+    eep.read(i, ((byte*)&myByte), sizeof(byte));
+    // if not the same add an error
+    if(myByte != bToWrite)
+      errors++;
+      
+    //restore previous value
+    eep.write(i, ((byte*)&currentByte), sizeof(currentByte));
+    delay(5);
+  }
+  return errors;
+}
+
+// this will check the memory size
+int logger_I2C_eeprom::checkMemorySize() {
+  int memSize=0;
+
+  // check for 4093 = 32K
+  if (checkWrite(4093))
+      memSize = 32;
+  // check for 8187 = 64 K
+  if (checkWrite(8187))
+      memSize = 64;
+  // check for 16375 = 128k
+  if (checkWrite(16375))
+      memSize = 128;
+  // check for 32750 = 256K
+  if (checkWrite(32750))
+      memSize = 256;
+  // check for 65500=512K
+  if (checkWrite(65500))
+      memSize = 512;
+  return memSize;
+}
+
+bool logger_I2C_eeprom::checkWrite(long address) {
+    bool ok = false;
+   //read byte and save it
+    byte currentByte;
+    eep.read(address, ((byte*)&currentByte), sizeof(byte));
+    SerialCom.print("currentByte:");
+    SerialCom.println(currentByte);
+    //write byte 
+    byte bToWrite = ~currentByte; 
+    eep.write(address, ((byte*)&bToWrite), sizeof(currentByte));
+    SerialCom.print("bToWrite:");
+    SerialCom.println(bToWrite);
+    delay(5);
+    //check if value is the same
+    byte myByte;
+    eep.read(address, ((byte*)&myByte), sizeof(byte));
+    SerialCom.print("myByte:");
+    SerialCom.println(myByte);
+    if(myByte == bToWrite)
+      ok = true;
+    //restore previous value
+    eep.write(address, ((byte*)&currentByte), sizeof(currentByte));
+    delay(5);  
+    return ok;
+}

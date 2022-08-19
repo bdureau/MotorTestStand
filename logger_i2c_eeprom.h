@@ -68,11 +68,14 @@ public:
     long getThrustCurveStart(int ThrustCurveNbr);
     long getThrustCurveStop(int ThrustCurveNbr);
     void printThrustCurveData(int ThrustCurveNbr);
-
+    long checkMemoryErrors(long memoryLastAddress);
+    int checkMemorySize();
+    bool checkWrite(long address);
     boolean CanRecord();
     unsigned long writeFastThrustCurve(unsigned long eeaddress);
     long getSizeOfThrustCurveData();
     long getLastThrustCurveEndAddress();
+    
     
 private:
     

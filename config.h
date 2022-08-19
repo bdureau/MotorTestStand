@@ -17,9 +17,9 @@
 
 
 // if you have the STM32 shield then define TESTSTANDSTM32
-#define TESTSTANDSTM32
+//#define TESTSTANDSTM32
 
-//#define TESTSTANDSTM32V2
+#define TESTSTANDSTM32V2
 
 #ifdef TESTSTANDSTM32
 #define BOARD_FIRMWARE "TestStandSTM32"

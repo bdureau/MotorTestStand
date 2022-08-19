@@ -80,7 +80,7 @@ boolean canRecord = true;
 boolean exitRecording = true;
 long currentThrustCurveNbr;
 long currentThrust;
-//long currPressure;
+long currPressure=0;
 long currThrust = 0;
 long initialThrust;
 
@@ -157,15 +157,15 @@ void initTestStand() {
    ReadThrust()
 */
 long ReadThrust() {
+  //return  (long) KalmanCalc((abs(scale.get_units()) * 1000));
   return  (long) (abs(scale.get_units()) * 1000);
+   
 }
 
 long ReadPressure() {
 
   float sum = 0;
-  for (int i = 0; i < 40; i++) {
-
-
+  for (int i = 0; i < 20; i++) {
     int pressure = analogRead(PA7);
 
     sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
@@ -173,15 +173,9 @@ long ReadPressure() {
                                4.5,
                                0.0,
                                (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-    /*sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)1023000 / VOLT_DIVIDER_PRESSURE),
-                         0.5,
-                         4.5,
-                         0.0,
-                         (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));*/
-
     delay(1);
   }
-  return (long)  (sum / 40.0);
+  return (long)  (sum / 20.0);
 }
 
 /*
@@ -259,8 +253,8 @@ void setup()
   // let's do some dummy pressure reading
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
-    // ReadThrust();
-    ReadPressure();
+     ReadThrust();
+    //ReadPressure();
   }
 
   //let's read the testStand 0
@@ -346,8 +340,6 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, temp);
 
 #ifdef TESTSTANDSTM32V2
-    long currPressure = ReadPressure();
-
     sprintf(temp, "%i,", currPressure );
     strcat(testStandTelem, temp);
 #endif
@@ -389,6 +381,7 @@ void recordThrust()
   {
     //read current thrust
     currThrust = (ReadThrust() - initialThrust);
+    currPressure = ReadPressure();
 
     //if (( currThrust > config.startRecordThrust) && !recording )
     if ( !recording )
@@ -403,8 +396,11 @@ void recordThrust()
       {
         //Save start address
         logger.setThrustCurveStartAddress (currentThrustCurveNbr, currentMemaddress);
+        delay(10);
 #ifdef SERIAL_DEBUG
         SerialCom.println(F("Save start address\n"));
+        SerialCom.println(currentMemaddress);
+        SerialCom.println(currentThrustCurveNbr);
 #endif
       }
 
@@ -416,8 +412,7 @@ void recordThrust()
     {
       unsigned long currentTime;
       unsigned long diffTime;
-      long currPressure;
-
+     
       currThrust = (ReadThrust() - initialThrust);
       if (currThrust < 0)
         currThrust = 0;
@@ -449,7 +444,7 @@ void recordThrust()
         } else {
           //SerialCom.println("Recording..");
           //SerialCom.print(currentMemaddress);
-          SendTelemetry(millis() - initialTime, 100);
+          SendTelemetry(millis() - initialTime, 100 );
 
           if (currThrust < 100000) {
             currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
@@ -477,14 +472,14 @@ void recordThrust()
           delay(40);
 #endif
 #ifdef TESTSTANDSTM32V2
-        if (config.standResolution == 3)
-          delay(5);
+       if (config.standResolution == 3)
+          delay(10);
         else if (config.standResolution == 2)
-          delay(15);
+          delay(20);
         else if (config.standResolution == 1)
-          delay(25);
+          delay(30);
         else if (config.standResolution == 0)
-          delay(35);
+          delay(40);
 #endif
       }
 
@@ -533,6 +528,7 @@ void MainMenu()
     if (!FastReading)
     {
       currThrust = (ReadThrust() - initialThrust);
+      currPressure = ReadPressure();
       //SerialCom.println(currThrust);
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
@@ -794,6 +790,17 @@ void interpretCommandBuffer(char *commandbuffer) {
     initTestStand();
     SerialCom.print(F("config reseted\n"));
   }
+  // check memory
+   else if (commandbuffer[0] == 'u')
+  {
+    int memSize = logger.checkMemorySize();
+    SerialCom.print(F("Memory size: "));
+    SerialCom.println(memSize);
+    
+    long errors = logger.checkMemoryErrors(65500);
+    SerialCom.print(F("Nbr of errors: "));
+    SerialCom.println(errors);
+  }
   // Recording
   else if (commandbuffer[0] == 'w')
   {
@@ -903,6 +910,17 @@ void checkBatVoltage(float minVolt) {
       for (int i = 0; i < 10; i++)
       {
         tone(pinSpeaker, 1600, 1000);
+        delay(50);
+        noTone(pinSpeaker);
+      }
+      delay(1000);
+    }
+    // also check the pressure sensor
+    // var if 0 PSI of if greater than 100
+    if(currPressure == 0 || currPressure > 100) {
+      for (int i = 0; i < 10; i++)
+      {
+        tone(pinSpeaker, 1000, 1000);
         delay(50);
         noTone(pinSpeaker);
       }
@@ -1071,3 +1089,15 @@ int pressureSensorTypeToMaxValue( int type) {
 
   return maxValue;
 }
+
+/*int checkMemoryErrors(int memorySize) {
+  int errors = 0;
+  
+  return errors;
+}
+
+int checkMemorySize() {
+  int memorySize = 0;
+
+  return memorySize;
+}*/
