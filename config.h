@@ -47,7 +47,7 @@
 //////////// do not change anything after unless you know what you are doing /////////////////////
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 2
+#define MINOR_VERSION 3
 #define BUILD 1
 #define CONFIG_START 32
 
@@ -88,6 +88,7 @@ struct ConfigStruct {
   long calibration_factor;
   long current_offset;
   int pressure_sensor_type; //0 = none 
+  int telemetryType;
   int cksum;  
 };
 extern ConfigStruct config;

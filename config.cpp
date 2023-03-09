@@ -17,6 +17,7 @@ void defaultConfig()
   config.calibration_factor = -29566;//-33666; //-7050;
   config.current_offset= 606978;//-64591;
   config.pressure_sensor_type = 6; //"100 PSI", "150 PSI", "200 PSI", "300 PSI", "500 PSI", "1000 PSI", "1600 PSI"
+  config.telemetryType = 0;
   config.cksum = CheckSumConf(config);
 }
 
@@ -92,6 +93,10 @@ bool writeTestStandConfig( char *p ) {
         strcat(msg, str);
         break;
       case 11:
+        config.telemetryType = atoi(str);
+        strcat(msg, str);
+        break;  
+      case 12:
         //our checksum
         strChk= atoi(str);
         break;
@@ -100,7 +105,7 @@ bool writeTestStandConfig( char *p ) {
 
   }
   //we have a partial config
-  if (i<10)
+  if (i<11)
     return false;
 
   if(msgChk(msg, sizeof(msg)) != strChk)
@@ -177,6 +182,9 @@ bool writeTestStandConfigV2( char *p ) {
       case 10:
         config.pressure_sensor_type = (int)commandVal;
         break;
+      case 11:
+        config.telemetryType = (int)commandVal;
+        break;    
     }
 
   // add checksum
@@ -251,6 +259,9 @@ void printTestStandConfig()
   strcat(testStandConfig, temp);
 
   sprintf(temp, "%i,",config.pressure_sensor_type);
+  strcat(testStandConfig, temp);
+
+  sprintf(temp, "%i,",config.telemetryType);
   strcat(testStandConfig, temp);
   
   unsigned int chk = 0;

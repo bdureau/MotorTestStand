@@ -33,6 +33,8 @@
   Added connection test
   Major Changes on version 1.2
   Added casing pressure
+  Major Changes on version 1.3
+  Telemetry fixes
 
 */
 
@@ -209,7 +211,7 @@ void setup()
     config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
-  analogReadResolution(12);
+  analogReadResolution(12); //// need to review !!!!
 #ifdef TESTSTANDSTM32V2
   pinMode(PA7, INPUT_ANALOG);
 #endif
@@ -334,7 +336,13 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, "-1,");
 #endif
 
-    sprintf(temp, "%i,", (int)(100 * ((float)logger.getLastThrustCurveEndAddress() / endAddress)) );
+    //sprintf(temp, "%i,", (int)(100 * ((float)logger.getLastThrustCurveEndAddress() / endAddress)) );
+     if (!recording) {
+      sprintf(temp, "%i,", (int)(100 * ((float)logger.getLastThrustCurveEndAddress() / endAddress)) );
+    }
+    else {
+      sprintf(temp, "%i,", (int)(100 * ((float) currentMemaddress / endAddress)) );
+    }
     strcat(testStandTelem, temp);
     sprintf(temp, "%i,", logger.getLastThrustCurveNbr() + 1 );
     strcat(testStandTelem, temp);
@@ -498,7 +506,7 @@ void recordThrust()
         recording = false;
         SendTelemetry(millis() - initialTime, 100);
         // we have no more thrust telemetry is not required anymore
-        telemetryEnable = false;
+        //telemetryEnable = false;
         startState = HIGH;
         resetThrustCurve();
       }
