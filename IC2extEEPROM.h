@@ -55,6 +55,9 @@
 #ifndef IC2extEEPROM_h
 #define IC2extEEPROM_h
 
+#ifndef BUFFER_LENGTH
+#define BUFFER_LENGTH 32
+#endif
 #include <Arduino.h>
 
 //EEPROM size in kilobits. EEPROM part numbers are usually designated in k-bits.

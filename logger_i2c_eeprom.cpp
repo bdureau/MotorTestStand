@@ -146,6 +146,14 @@ int logger_I2C_eeprom::printThrustCurveList()
   {
     if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
       break;
+    #ifdef TESTSTANDESP32
+    Serial.print("ThrustCurve Nbr: ");
+    Serial.println(i);
+    Serial.print("Start: ");
+    Serial.println(_ThrustCurveConfig[i].ThrustCurve_start);
+    Serial.print("End: ");
+    Serial.println(_ThrustCurveConfig[i].ThrustCurve_stop);
+    #endif
     SerialCom.print("ThrustCurve Nbr: ");
     SerialCom.println(i);
     SerialCom.print("Start: ");
@@ -201,6 +209,16 @@ void logger_I2C_eeprom::setPressureCurveData( long pressure)
   _ThrustCurveData.casing_pressure = pressure;
 }
 #endif
+ #ifdef TESTSTANDESP32
+long logger_I2C_eeprom::getPressureCurveData()
+{
+  return _ThrustCurveData.casing_pressure;
+}
+void logger_I2C_eeprom::setPressureCurveData( long pressure)
+{
+  _ThrustCurveData.casing_pressure = pressure;
+}
+#endif
 long logger_I2C_eeprom::getSizeOfThrustCurveData()
 {
   return sizeof(_ThrustCurveData);
@@ -242,6 +260,10 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       sprintf(temp, "%i", chk);
       strcat(ThrustCurveData, temp);
       strcat(ThrustCurveData, ";\n");
+      #ifdef TESTSTANDESP32
+      Serial.print("$");
+      Serial.print(ThrustCurveData);
+      #endif
       SerialCom.print("$");
       SerialCom.print(ThrustCurveData);
 

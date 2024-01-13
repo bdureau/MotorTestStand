@@ -22,6 +22,9 @@ struct ThrustCurveDataStruct {
   #ifdef TESTSTANDSTM32V2
   long casing_pressure;
   #endif
+  #ifdef TESTSTANDESP32
+  long casing_pressure;
+  #endif
 };
 struct ThrustCurveConfigStruct {
   long ThrustCurve_start;    
@@ -62,6 +65,10 @@ public:
     void setThrustCurveData( long thrust);
     long getThrustCurveData();
     #ifdef TESTSTANDSTM32V2
+    long getPressureCurveData();
+    void setPressureCurveData( long pressure);
+    #endif
+    #ifdef TESTSTANDESP32
     long getPressureCurveData();
     void setPressureCurveData( long pressure);
     #endif

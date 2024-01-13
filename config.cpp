@@ -25,10 +25,15 @@ bool readTestStandConfig() {
   //set the config to default values so that if any have not been configured we can use the default ones
   defaultConfig();
   int i;
+  #ifdef TESTSTANDESP32
+  EEPROM.begin(512);
+  #endif
   for ( i = 0; i < sizeof(config); i++ ) {
     *((char*)&config + i) = EEPROM.read(CONFIG_START + i);
   }
-
+  #ifdef TESTSTANDESP32
+  EEPROM.end();
+  #endif
   if ( config.cksum != CheckSumConf(config) ) {
     return false;
   }
@@ -200,9 +205,16 @@ bool writeTestStandConfigV2( char *p ) {
 void writeConfigStruc()
 {
   int i;
+  #ifdef TESTSTANDESP32
+  EEPROM.begin(512);
+  #endif
   for ( i = 0; i < sizeof(config); i++ ) {
     EEPROM.write(CONFIG_START + i, *((char*)&config + i));
   }
+  #ifdef TESTSTANDESP32
+  EEPROM.commit();
+  EEPROM.end();
+  #endif
 }
 /*
 
@@ -269,8 +281,23 @@ void printTestStandConfig()
   sprintf(temp, "%i;\n", chk);
   strcat(testStandConfig, temp);
 
+  #ifdef TESTSTANDESP32
+  Serial.print("$");
+  Serial.print(testStandConfig);
+  #endif
   SerialCom.print("$");
-  SerialCom.print(testStandConfig);
+  //SerialCom.print(testStandConfig);
+  // the following will slow down the connection speed so that it works better with telemetry module
+  // or bluetooth module with no buffer
+  /*if (config.telemetryType == 1){
+  for(int j=0; j< sizeof(testStandConfig);j++) {
+    SerialCom.print(testStandConfig[j]);
+    delay(2);
+  }
+  } 
+  else*/
+    SerialCom.print(testStandConfig);
+  
 
 }
 bool CheckValideBaudRate(long baudRate)

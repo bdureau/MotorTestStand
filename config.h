@@ -15,11 +15,12 @@
 // note that you will need to compile using the Arduino Uno or SMT32 board
 //#define TESTSTAND
 
-
 // if you have the STM32 shield then define TESTSTANDSTM32
-//#define TESTSTANDSTM32
+#define TESTSTANDSTM32
+//#define TESTSTANDSTM32V2
 
-#define TESTSTANDSTM32V2
+// if you have the esp32 version
+//#define TESTSTANDESP32
 
 #ifdef TESTSTANDSTM32
 #define BOARD_FIRMWARE "TestStandSTM32"
@@ -29,6 +30,10 @@
 #endif
 #ifdef TESTSTAND
 #define BOARD_FIRMWARE "TestStand"
+#endif
+#ifdef TESTSTANDESP32
+//#define BOARD_FIRMWARE "TestStandESP32"
+#define BOARD_FIRMWARE "TestStandSTM32V2"
 #endif
 
 // If you want to have additionnal debugging uncomment it
@@ -47,7 +52,7 @@
 //////////// do not change anything after unless you know what you are doing /////////////////////
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 3
+#define MINOR_VERSION 4
 #define BUILD 1
 #define CONFIG_START 32
 
@@ -59,6 +64,9 @@
 #include <itoa.h>
 #endif
 
+#ifdef TESTSTANDESP32
+//#include <itoa.h>
+#endif
 
 #ifdef TESTSTANDSTM32 
 #define SerialCom Serial1
@@ -70,7 +78,12 @@
 #define SerialCom Serial
 #endif
 
-
+#ifdef TESTSTANDESP32
+#include "BluetoothSerial.h"
+extern BluetoothSerial SerialBT;
+#define SerialCom SerialBT
+#define BUFFER_LENGTH I2C_BUFFER_LENGTH
+#endif
 
 #include "Arduino.h"
 //used for writing in the microcontroler internal eeprom

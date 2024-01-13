@@ -20,6 +20,9 @@ const int pinSpeaker = PA0;
 const int pinSpeaker = PA0;
 #endif
 
+#ifdef TESTSTANDESP32
+const int pinSpeaker = 4;
+#endif
 int beepingFrequency =440;
 
 /*int lastPin = -1;
@@ -43,9 +46,16 @@ void beginBeepSeq()
   {
     for (i = 0; i < 10; i++)
     {
+      #ifdef TESTSTANDESP32
+      tone(pinSpeaker, 1600, 50);
+      noTone(pinSpeaker);
+      delay(50);
+      #endif
+      #ifndef TESTSTANDESP32
       tone(pinSpeaker, 1600, 1000);
       delay(50);
       noTone(pinSpeaker);
+      #endif
     }
     delay(1000);
   }
@@ -54,18 +64,32 @@ void longBeep()
 {
   if (NoBeep == false)
   {
+    #ifdef TESTSTANDESP32
+    tone(pinSpeaker, beepingFrequency, 1000);
+    delay(1000);
+    noTone(pinSpeaker);
+    #endif
+    #ifndef TESTSTANDESP32
     tone(pinSpeaker, beepingFrequency, 1000);
     delay(1500);
     noTone(pinSpeaker);
+    #endif
   }
 }
 void shortBeep()
 {
   if (NoBeep == false)
   {
+    #ifdef TESTSTANDESP32
+    tone(pinSpeaker, beepingFrequency, 25);
+    noTone(pinSpeaker);
+    delay(300);
+    #endif
+    #ifndef TESTSTANDESP32
     tone(pinSpeaker, beepingFrequency, 25);
     delay(300);
     noTone(pinSpeaker);
+    #endif
   }
 }
 void beepTestStandVersion (int majorNbr, int minorNbr)
