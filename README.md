@@ -29,3 +29,25 @@ and the testStand can be something like this
 <img src="/board images/TestStand.jpg" width="49%">   
 
 Note that I you are not a developper you can flash your board with this firmware using the Android app that you have installed from the App Store
+
+# Compiling the code
+The firmware runs on different board and can be compiled for ATMega 328, STM32 or ESP32
+To compile it for a specific board you need to edit the config.h file and select the appropriate board using compilation directives
+Only uncomment one of those:
+
+for ATMega328
+
+#define TESTSTAND 
+
+for STM32
+
+#define TESTSTANDSTM32
+
+or
+
+#define TESTSTANDSTM32V2
+
+for ESP32
+
+#define TESTSTANDESP32
+
