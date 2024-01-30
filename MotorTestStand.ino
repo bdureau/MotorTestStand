@@ -1,6 +1,6 @@
 /*
-  Rocket Motor test stand ver 1.2
-  Copyright Boris du Reau 2012-2022
+  Rocket Motor test stand ver 1.4
+  Copyright Boris du Reau 2012-2024
 
   The following is a datalogger for logging rocket motor thrustcurves.
 
@@ -35,6 +35,11 @@
   Added casing pressure
   Major Changes on version 1.3
   Telemetry fixes
+  Major Changes on version 1.4
+  Ported to ESP32
+  Major Changes on version 1.5
+  Use internal HX711 lib
+  Changed calibration routines
 
 */
 
@@ -46,20 +51,29 @@
 #include "logger_i2c_eeprom.h"
 #include "HX711.h"
 
+#ifdef TESTSTANDESP32
+BluetoothSerial SerialBT;
+#endif
+
 
 // HX711 circuit wiring
 #ifdef TESTSTAND
 const int LOADCELL_DOUT_PIN = 3;
 const int LOADCELL_SCK_PIN = 2;
 #endif
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2
 const int LOADCELL_DOUT_PIN = PB15;
 const int LOADCELL_SCK_PIN = PB14;
 #endif
 
-#ifdef TESTSTANDSTM32V2
+/*#ifdef TESTSTANDSTM32V2
 const int LOADCELL_DOUT_PIN = PB15;
 const int LOADCELL_SCK_PIN = PB14;
+#endif*/
+
+#ifdef TESTSTANDESP32
+const int LOADCELL_DOUT_PIN = 16;
+const int LOADCELL_SCK_PIN = 19;
 #endif
 
 //////////////////////////////////////////////////////////////////////
@@ -67,7 +81,7 @@ const int LOADCELL_SCK_PIN = PB14;
 //////////////////////////////////////////////////////////////////////
 
 HX711 scale;
-//#define LB2KG  0.45352
+
 //EEProm address
 logger_I2C_eeprom logger(0x50) ;
 // End address of the 512 eeprom
@@ -90,21 +104,27 @@ long initialThrust;
 boolean motorStarted = false;
 unsigned long initialTime;
 boolean FastReading = false;
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2
 const int startPin =  PA1;
 #endif
-#ifdef TESTSTANDSTM32V2
+/*#ifdef TESTSTANDSTM32V2
 const int startPin =  PA1;
-#endif
+#endif*/
 #ifdef TESTSTAND
 const int startPin =  10;
 #endif
+
+#ifdef TESTSTANDESP32
+const int startPin =  23;
+#endif
+
 int startState = HIGH;
 //telemetry
 boolean telemetryEnable = false;
 long lastTelemetry = 0;
 long lastBattWarning = 0;
 boolean recording = false;
+
 
 void MainMenu();
 /*
@@ -136,22 +156,16 @@ void initTestStand() {
   //  calibration_factor= config.calibration_factor ;
   //  currentOffset = config.current_offset;
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  //scale.set_scale(2280.f);
-  //float LB2KG  = 0.45352;
-  if (config.calibration_factor == 0)
-    config.calibration_factor = -29566;//-33666;
-  if (config.current_offset == 0)
-    config.current_offset = 606978; //-64591;
+  delay(1000);
+  if (config.calibration_factor != 0)
+    scale.set_scale((float)config.calibration_factor);
+  
+  if (config.current_offset != 0)
+    scale.set_offset( config.current_offset);
   scale.tare();
-  config.current_offset = scale.get_offset();
-  //scale.set_scale((float)config.calibration_factor / LB2KG);
-  scale.set_scale((float)config.calibration_factor );
-  //scale.set_scale(2280.f);
 
-
-  // scale.set_offset( config.current_offset);
-  SerialCom.println(config.calibration_factor);
-  SerialCom.println(config.current_offset);
+  //SerialCom.println(config.calibration_factor);
+  //SerialCom.println(config.current_offset);
   SerialCom.println("Scale tared");
 }
 
@@ -160,10 +174,12 @@ void initTestStand() {
 */
 long ReadThrust() {
   //return  (long) KalmanCalc((abs(scale.get_units()) * 1000));
-  return  (long) (abs(scale.get_units()) * 1000);
+  //return  (long) (abs(scale.get_units(5)) * 1000);
+  return  (long) ((scale.get_units(5)) * 1000);
    
 }
-
+//#ifdef TESTSTANDSTM32V2
+#if defined(TESTSTANDSTM32) || defined(TESTSTANDSTM32V2)
 long ReadPressure() {
 
   float sum = 0;
@@ -179,6 +195,25 @@ long ReadPressure() {
   }
   return (long)  (sum / 20.0);
 }
+#endif
+#ifdef TESTSTANDESP32
+long ReadPressure() {
+
+  float sum = 0;
+  for (int i = 0; i < 20; i++) {
+    //int pressure = analogRead(32);
+    int pressure = analogReadAdjusted(32);
+
+    sum += (float)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
+                               0.5,
+                               4.5,
+                               0.0,
+                               (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
+    delay(1);
+  }
+  return (long)  (sum / 20.0);
+}
+#endif
 
 /*
    setup()
@@ -211,9 +246,17 @@ void setup()
     config.cksum = CheckSumConf(config);
     writeConfigStruc();
   }
+
+#ifdef TESTSTANDSTM32
   analogReadResolution(12); //// need to review !!!!
+#endif
 #ifdef TESTSTANDSTM32V2
   pinMode(PA7, INPUT_ANALOG);
+  analogReadResolution(12); //// need to review !!!!
+#endif
+
+#ifdef TESTSTANDESP32
+  //pinMode(32, INPUT_ANALOG);
 #endif
   // init Kalman filter
   KalmanInit();
@@ -221,12 +264,21 @@ void setup()
   //You can change the baud rate here
   //and change it to 57600, 115200 etc..
   config.connectionSpeed = 38400;
-  //SerialCom.begin(config.connectionSpeed);
-  SerialCom.begin(38400);
+  
+#ifdef TESTSTANDESP32
+  Serial.begin(38400);
+  char standName [15];
+  sprintf(standName, "ESP32Stand%i", /*(int)config.altiID*/ 0 );
+  Serial.println(standName);
+  SerialCom.begin(standName);
+#else
+ SerialCom.begin(38400);
+#endif 
   SerialCom.print("pressure_sensor_type" );
   SerialCom.println(config.pressure_sensor_type);
   SerialCom.print("connectionSpeed" );
   SerialCom.println(config.connectionSpeed);
+  
   //  pinMode(A0, INPUT);
 #ifdef TESTSTAND
   //software pull up so that all bluetooth modules work!!! took me a good day to figure it out
@@ -234,14 +286,18 @@ void setup()
 #endif
 
   //software pull up so that all bluetooth modules work!!!
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2
   pinMode(PB11, INPUT_PULLUP);
 #endif
-#ifdef TESTSTANDSTM32V2
+/*#ifdef TESTSTANDSTM32V2
   pinMode(PB11, INPUT_PULLUP);
-#endif
-  pinMode(startPin, INPUT);
+#endif*/
+  
+  pinMode(startPin, INPUT_PULLUP);
   SerialCom.print(F("Start program\n"));
+  #ifdef TESTSTANDESP32
+  Serial.print(F("Start program\n"));
+  #endif
   initTestStand();
   pinMode(pinSpeaker, OUTPUT);
 
@@ -256,7 +312,6 @@ void setup()
   // to initialise the Kalman filter
   for (int i = 0; i < 50; i++) {
      ReadThrust();
-    //ReadPressure();
   }
 
   //let's read the testStand 0
@@ -266,8 +321,6 @@ void setup()
     delay(50);
   }
   initialThrust = (sum / 10.0);
-
-  // thrustDetect = config.startRecordThrust; //20;
 
   SerialCom.print(F("before read list\n"));
   int v_ret;
@@ -290,9 +343,15 @@ void setup()
   canRecord = logger.CanRecord();
   if (!canRecord) {
     SerialCom.println("Cannot record");
+    #ifdef TESTSTANDESP32
+    Serial.println("Cannot record");
+    #endif
     beginBeepSeq();
   }
   SerialCom.println("End init");
+  #ifdef TESTSTANDESP32
+  Serial.println("End init");
+  #endif
 }
 
 
@@ -316,7 +375,7 @@ void SendTelemetry(long sampleTime, int freq) {
     sprintf(temp, "%i,", sampleTime);
     strcat(testStandTelem, temp);
 
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2
     pinMode(PB1, INPUT_ANALOG);
     int batVoltage = analogRead(PB1);
     float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
@@ -324,9 +383,16 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
 #endif
-#ifdef TESTSTANDSTM32V2
+/*#ifdef TESTSTANDSTM32V2
     pinMode(PB1, INPUT_ANALOG);
     int batVoltage = analogRead(PB1);
+    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
+    dtostrf(bat, 4, 2, temp);
+    strcat(testStandTelem, temp);
+    strcat(testStandTelem, ",");
+#endif*/
+#ifdef TESTSTANDESP32
+    int batVoltage =analogReadAdjusted(2);
     float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
     dtostrf(bat, 4, 2, temp);
     strcat(testStandTelem, temp);
@@ -336,7 +402,6 @@ void SendTelemetry(long sampleTime, int freq) {
     strcat(testStandTelem, "-1,");
 #endif
 
-    //sprintf(temp, "%i,", (int)(100 * ((float)logger.getLastThrustCurveEndAddress() / endAddress)) );
      if (!recording) {
       sprintf(temp, "%i,", (int)(100 * ((float)logger.getLastThrustCurveEndAddress() / endAddress)) );
     }
@@ -362,6 +427,10 @@ void SendTelemetry(long sampleTime, int freq) {
     sprintf(temp, "%i", chk);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ";\n");
+    #ifdef TESTSTANDESP32
+      Serial.print("$");
+      Serial.print(testStandTelem);
+    #endif
     SerialCom.print("$");
     SerialCom.print(testStandTelem);
   }
@@ -429,6 +498,12 @@ void recordThrust()
       if (currPressure < 0)
         currPressure = 0;
 #endif
+
+#ifdef TESTSTANDESP32
+      currPressure = ReadPressure();
+      if (currPressure < 0)
+        currPressure = 0;
+#endif
       currentTime = millis() - initialTime;
 
       SendTelemetry(currentTime, 200);
@@ -441,6 +516,10 @@ void recordThrust()
         logger.setThrustCurveTimeData( diffTime);
         logger.setThrustCurveData(currThrust);
 #ifdef TESTSTANDSTM32V2
+        logger.setPressureCurveData(currPressure);
+#endif
+
+#ifdef TESTSTANDESP32
         logger.setPressureCurveData(currPressure);
 #endif
 
@@ -459,7 +538,7 @@ void recordThrust()
             currentMemaddress++;
           }
         }
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2 || defined TESTSTAND
         if (config.standResolution == 3)
           delay(10);
         else if (config.standResolution == 2)
@@ -469,7 +548,7 @@ void recordThrust()
         else if (config.standResolution == 0)
           delay(40);
 #endif
-#ifdef TESTSTAND
+/*#ifdef TESTSTAND
         if (config.standResolution == 3)
           delay(10);
         else if (config.standResolution == 2)
@@ -480,6 +559,17 @@ void recordThrust()
           delay(40);
 #endif
 #ifdef TESTSTANDSTM32V2
+       if (config.standResolution == 3)
+          delay(10);
+        else if (config.standResolution == 2)
+          delay(20);
+        else if (config.standResolution == 1)
+          delay(30);
+        else if (config.standResolution == 0)
+          delay(40);
+#endif*/
+
+#ifdef TESTSTANDESP32
        if (config.standResolution == 3)
           delay(10);
         else if (config.standResolution == 2)
@@ -537,14 +627,15 @@ void MainMenu()
     {
       currThrust = (ReadThrust() - initialThrust);
       currPressure = ReadPressure();
-      //SerialCom.println(currThrust);
+      
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
-      //= digitalRead(buttonPin);
+      
       startState = digitalRead(startPin);
-
+      
       if (startState == HIGH)
       {
+        //Serial.print("HIGH");
         SendTelemetry(0, 500);
         checkBatVoltage(BAT_MIN_VOLTAGE);
       }
@@ -553,8 +644,6 @@ void MainMenu()
         exitRecording = false;
         recordThrust();
       }
-      //long savedTime = millis();
-
     }
 
     while (SerialCom.available())
@@ -571,6 +660,22 @@ void MainMenu()
         break;
       }
     }
+    /*#ifdef TESTSTANDESP32
+    while (Serial.available())
+    {
+      readVal = Serial.read();
+      if (readVal != ';' )
+      {
+        if (readVal != '\n')
+          commandbuffer[i++] = readVal;
+      }
+      else
+      {
+        commandbuffer[i++] = '\0';
+        break;
+      }
+    }
+    #endif*/
   }
   interpretCommandBuffer(commandbuffer);
 
@@ -584,9 +689,9 @@ void MainMenu()
 
    Commands are as folow:
    a  get all thrustcurve data
-   b  get altimeter config
+   b  get teststand config
    c  toggle continuity on and off
-   d  reset alti config
+   d  reset teststand config
    e  erase all saved thrust curve
    f  FastReading on
    g  FastReading off
@@ -597,11 +702,11 @@ void MainMenu()
    l  list all thrust curves
    m  followed by a number turn main loop on/off. if number is 1 then
       main loop in on else turn it off
-   n  Return the number of recorded flights in the EEprom
-   r  followed by a number which is the flight number.
+   n  Return the number of recorded thrustcurves in the EEprom
+   r  followed by a number which is the recording number.
       This will retrieve all data for the specified flight
-   s  write altimeter config
-   t  reset alti config (why?)
+   s  write teststand config
+   t  reset teststand config (why?)
    w  Start or stop recording
    x  delete last curve
    y  followed by a number turn telemetry on/off. if number is 1 then
@@ -612,6 +717,9 @@ void interpretCommandBuffer(char *commandbuffer) {
   //get all ThrustCurve data
   if (commandbuffer[0] == 'a')
   {
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$start;\n"));
+    #endif
     SerialCom.print(F("$start;\n"));
     int i;
     ///todo
@@ -619,15 +727,33 @@ void interpretCommandBuffer(char *commandbuffer) {
     {
       logger.printThrustCurveData(i);
     }
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$end;\n"));
+    #endif
     SerialCom.print(F("$end;\n"));
   }
   //get Test Stand config
   else if (commandbuffer[0] == 'b')
   {
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$start;\n"));
+    #endif
     SerialCom.print(F("$start;\n"));
+    
     printTestStandConfig();
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$end;\n"));
+    #endif
     SerialCom.print(F("$end;\n"));
   }
+  //prepare calibrate
+  else if (commandbuffer[0] == 'k')
+  {
+    //remove weight
+    scale.tare();
+    //offset = scale.get_offset();
+  }
+  
   //calibrate
   else if (commandbuffer[0] == 'c')
   {
@@ -639,8 +765,15 @@ void interpretCommandBuffer(char *commandbuffer) {
     }
     temp[i] = '\0';
 
-    calibrate(config.calibration_factor, (float)atof(temp));
+    //calibrate(config.calibration_factor, (float)atof(temp));
+    //calibrate(0, (float)atof(temp));
+    SendCalibration(config.current_offset, (long)config.calibration_factor, "Init");
+    scale.calibrate_scale((float)atof(temp), 5);
+    config.current_offset = scale.get_offset();
+    config.calibration_factor = scale.get_scale();
+    SendCalibration(config.current_offset, (long)config.calibration_factor, "In progress");
     config.cksum = CheckSumConf(config);
+    SendCalibration(config.current_offset, (long)config.calibration_factor, "Done");
     writeConfigStruc();
     SerialCom.print(F("$OK;\n"));
   }
@@ -664,18 +797,27 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'f')
   {
     FastReading = true;
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   //FastReading off
   else if (commandbuffer[0] == 'g')
   {
     FastReading = false;
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   //hello
   else if (commandbuffer[0] == 'h')
   {
     //FastReading = false;
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   // unused
@@ -687,6 +829,9 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'j')
   {
     scale.tare();
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   //list all ThrustCurve
@@ -710,6 +855,9 @@ void interpretCommandBuffer(char *commandbuffer) {
 #endif
       //mainLoopEnable = false;
     }
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   //Number of ThrustCurve
@@ -717,6 +865,9 @@ void interpretCommandBuffer(char *commandbuffer) {
   {
     char thrustCurveData[30] = "";
     char temp[9] = "";
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$start;\n"));
+    #endif
     SerialCom.print(F("$start;\n"));
     strcat(thrustCurveData, "nbrOfThrustCurve,");
     sprintf(temp, "%i,", logger.getLastThrustCurveNbr() + 1 );
@@ -725,6 +876,11 @@ void interpretCommandBuffer(char *commandbuffer) {
     sprintf(temp, "%i", chk);
     strcat(thrustCurveData, temp);
     strcat(thrustCurveData, ";\n");
+    #ifdef TESTSTANDESP32
+    Serial.print("$");
+    Serial.print(thrustCurveData);
+    Serial.print(F("$end;\n"));
+    #endif
     SerialCom.print("$");
     SerialCom.print(thrustCurveData);
     SerialCom.print(F("$end;\n"));
@@ -732,8 +888,14 @@ void interpretCommandBuffer(char *commandbuffer) {
   // send test tram
   else if (commandbuffer[0] == 'o')
   {
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$start;\n"));
+    #endif
     SerialCom.print(F("$start;\n"));
     sendTestTram();
+    #ifdef TESTSTANDESP32
+    Serial.print(F("$end;\n"));
+    #endif
     SerialCom.print(F("$end;\n"));
   }
   //test stand config param
@@ -741,16 +903,26 @@ void interpretCommandBuffer(char *commandbuffer) {
   else if (commandbuffer[0] == 'p')
   {
     if (writeTestStandConfigV2(commandbuffer)) {
+      #ifdef TESTSTANDESP32
+      Serial.print(F("$OK;\n"));
+      #endif
       SerialCom.print(F("$OK;\n"));
     }
-    else
+    else {
+      #ifdef TESTSTANDESP32
+      Serial.print(F("$KO;\n"));
+      #endif
       SerialCom.print(F("$KO;\n"));
+    }
   }
   else if (commandbuffer[0] == 'q')
   {
     writeConfigStruc();
     readTestStandConfig();
     initTestStand();
+    #ifdef TESTSTANDESP32
+      Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
     
   }
@@ -844,15 +1016,25 @@ void interpretCommandBuffer(char *commandbuffer) {
       SerialCom.print(F("Telemetry disabled\n"));
       telemetryEnable = false;
     }
+    #ifdef TESTSTANDESP32
+      Serial.print(F("$OK;\n"));
+    #endif
     SerialCom.print(F("$OK;\n"));
   }
   // empty command
   else if (commandbuffer[0] == ' ')
   {
+    #ifdef TESTSTANDESP32
+      Serial.print(F("$KO;\n"));
+    #endif
     SerialCom.print(F("$K0;\n"));
   }
   else
   {
+    #ifdef TESTSTANDESP32
+      Serial.print(F("$UNKNOWN;"));
+    Serial.println(commandbuffer[0]);
+    #endif
     SerialCom.print(F("$UNKNOWN;"));
     SerialCom.println(commandbuffer[0]);
   }
@@ -936,23 +1118,48 @@ void checkBatVoltage(float minVolt) {
     }
   }
 #endif
+#ifdef TESTSTANDESP32
+if ((millis() - lastBattWarning) > 10000) {
+    lastBattWarning = millis();
+   
+    double batVoltage =analogReadAdjusted(2);
+    
+    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
 
+    if (bat < minVolt) {
+      for (int i = 0; i < 10; i++)
+      {
+        tone(pinSpeaker, 1600, 1000);
+        noTone(pinSpeaker);
+        delay(50);
+      }
+      delay(1000);
+    }
+    // also check the pressure sensor
+    // var if 0 PSI of if greater than 100
+    if(currPressure == 0 || currPressure > 100) {
+      for (int i = 0; i < 10; i++)
+      {
+        tone(pinSpeaker, 1000, 1000);
+        
+        noTone(pinSpeaker);
+        delay(50);
+      }
+      delay(1000);
+    }
+  }
+#endif
 }
 
 /*
    Calibrate the test stand
 */
-void calibrate(float calibration_factor , float CALWEIGHT) {
+/*void calibrate(float calibration_factor , float CALWEIGHT) {
   long currentOffset;
   float LB2KG  = 0.45352;
-  //SerialCom.println("Calibrate");
-  //SerialCom.println(CALWEIGHT);
-  //scale.set_scale(calibration_factor / LB2KG);
-  currentOffset = scale.get_offset();
-  scale.set_scale(calibration_factor );
-  // set tare and save value
-  //scale.tare();
-
+  
+  currentOffset = offset; //scale.get_offset();
+  
   SendCalibration(currentOffset, (long)calibration_factor, "Init");
   boolean done = false;
   uint8_t flipDirCount = 0;
@@ -965,9 +1172,7 @@ void calibrate(float calibration_factor , float CALWEIGHT) {
   {
     // get data
     data = abs(scale.get_units());
-    //SerialCom.println("data = " + String(data, 2));
-    //Serial.println("abs = " + String(abs(data - CALWEIGHT), 4));
-    //SerialCom.println("calibration_factor = " + String(calibration_factor));
+   
     // if not match
     if (abs(data - CALWEIGHT) >= 0.01)
     {
@@ -988,12 +1193,11 @@ void calibrate(float calibration_factor , float CALWEIGHT) {
         {
           dirScale = dirScale / 10;
           flipDirCount = 0;
-          //Serial.println("dirScale = " + String(dirScale));
         }
       }
       // set new factor
       calibration_factor += direction * dirScale;
-      //scale.set_scale(calibration_factor / LB2KG);
+
       scale.set_scale(calibration_factor);
       SendCalibration(currentOffset, (long)calibration_factor, "In progress");
       //short delay
@@ -1020,7 +1224,7 @@ void calibrate(float calibration_factor , float CALWEIGHT) {
   scale.set_scale((float)config.calibration_factor);
   SendCalibration(currentOffset, (long)calibration_factor, "Done");
 
-}
+}*/
 
 void SendCalibration(long calibration_offset, long calibration_factor, char *flag) {
   char testStandCalibration[50] = "";
@@ -1040,6 +1244,10 @@ void SendCalibration(long calibration_offset, long calibration_factor, char *fla
   sprintf(temp, "%i", chk);
   strcat(testStandCalibration, temp);
   strcat(testStandCalibration, ";\n");
+  #ifdef TESTSTANDESP32
+  Serial.print("$");
+  Serial.print(testStandCalibration);
+  #endif
   SerialCom.print("$");
   SerialCom.print(testStandCalibration);
 }
@@ -1059,6 +1267,11 @@ void sendTestTram() {
   sprintf(temp, "%i", chk);
   strcat(altiTest, temp);
   strcat(altiTest, ";\n");
+
+  #ifdef TESTSTANDESP32
+  Serial.print("$");
+  Serial.print(altiTest);
+  #endif
   SerialCom.print("$");
   SerialCom.print(altiTest);
 
@@ -1098,6 +1311,55 @@ int pressureSensorTypeToMaxValue( int type) {
   return maxValue;
 }
 
+#ifdef TESTSTANDESP32
+double analogReadAdjusted(byte pinNumber){
+
+  // Specify the adjustment factors.
+  const double f1 = 1.7111361460487501e+001;
+  const double f2 = 4.2319467860421662e+000;
+  const double f3 = -1.9077375643188468e-002;
+  const double f4 = 5.4338055402459246e-005;
+  const double f5 = -8.7712931081088873e-008;
+  const double f6 = 8.7526709101221588e-011;
+  const double f7 = -5.6536248553232152e-014;
+  const double f8 = 2.4073049082147032e-017;
+  const double f9 = -6.7106284580950781e-021;
+  const double f10 = 1.1781963823253708e-024;
+  const double f11 = -1.1818752813719799e-028;
+  const double f12 = 5.1642864552256602e-033;
+
+  // Specify the number of loops for one measurement.
+  const int loops = 40;
+
+  // Specify the delay between the loops.
+  const int loopDelay = 1;
+
+  // Initialize the used variables.
+  int counter = 1;
+  int inputValue = 0;
+  double totalInputValue = 0;
+  double averageInputValue = 0;
+
+  // Loop to get the average of different analog values.
+  for (counter = 1; counter <= loops; counter++) {
+
+    // Read the analog value.
+    inputValue = analogRead(pinNumber);
+
+    // Add the analog value to the total.
+    totalInputValue += inputValue;
+
+    // Wait some time after each loop.
+    delay(loopDelay);
+  }
+
+  // Calculate the average input value.
+  averageInputValue = totalInputValue / loops;
+
+  // Calculate and return the adjusted input value.
+  return f1 + f2 * pow(averageInputValue, 1) + f3 * pow(averageInputValue, 2) + f4 * pow(averageInputValue, 3) + f5 * pow(averageInputValue, 4) + f6 * pow(averageInputValue, 5) + f7 * pow(averageInputValue, 6) + f8 * pow(averageInputValue, 7) + f9 * pow(averageInputValue, 8) + f10 * pow(averageInputValue, 9) + f11 * pow(averageInputValue, 10) + f12 * pow(averageInputValue, 11);
+}
+#endif
 /*int checkMemoryErrors(int memorySize) {
   int errors = 0;
   
