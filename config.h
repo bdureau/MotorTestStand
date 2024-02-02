@@ -32,8 +32,8 @@
 #define BOARD_FIRMWARE "TestStand"
 #endif
 #ifdef TESTSTANDESP32
-//#define BOARD_FIRMWARE "TestStandESP32"
-#define BOARD_FIRMWARE "TestStandSTM32V2"
+#define BOARD_FIRMWARE "TestStandESP32"
+//#define BOARD_FIRMWARE "TestStandSTM32V2"
 #endif
 
 // If you want to have additionnal debugging uncomment it

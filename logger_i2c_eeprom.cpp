@@ -199,7 +199,7 @@ long logger_I2C_eeprom::getThrustCurveData()
 {
   return _ThrustCurveData.thrust;
 }
-#ifdef TESTSTANDSTM32V2
+#if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32
 long logger_I2C_eeprom::getPressureCurveData()
 {
   return _ThrustCurveData.casing_pressure;
@@ -209,16 +209,7 @@ void logger_I2C_eeprom::setPressureCurveData( long pressure)
   _ThrustCurveData.casing_pressure = pressure;
 }
 #endif
-#ifdef TESTSTANDESP32
-long logger_I2C_eeprom::getPressureCurveData()
-{
-  return _ThrustCurveData.casing_pressure;
-}
-void logger_I2C_eeprom::setPressureCurveData( long pressure)
-{
-  _ThrustCurveData.casing_pressure = pressure;
-}
-#endif
+
 long logger_I2C_eeprom::getSizeOfThrustCurveData()
 {
   return sizeof(_ThrustCurveData);
@@ -252,7 +243,7 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       sprintf(temp, "%i,", (int)getThrustCurveData() );
       //sprintf(temp, "%lu,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
-      #ifdef TESTSTANDSTM32V2
+      #if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32
       sprintf(temp, "%i,", (int)getPressureCurveData() );
       strcat(ThrustCurveData, temp);
       #endif
