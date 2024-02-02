@@ -1,4 +1,4 @@
-# MotorTestStand
+# MotorTestStand (firmware)
 Rocket motor datalogger firmware.
 Can do the following
 - Use any gauge sensor, it calibrate itself using a known weight
