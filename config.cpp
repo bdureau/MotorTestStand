@@ -18,6 +18,9 @@ void defaultConfig()
   config.current_offset = 0;
   config.pressure_sensor_type = 6; //"100 PSI", "150 PSI", "200 PSI", "300 PSI", "500 PSI", "1000 PSI", "1600 PSI"
   config.telemetryType = 0;
+  #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+  config.pressure_sensor_type2 = 6;
+  #endif
   config.cksum = CheckSumConf(config);
 }
 
@@ -25,13 +28,13 @@ bool readTestStandConfig() {
   //set the config to default values so that if any have not been configured we can use the default ones
   defaultConfig();
   int i;
-  #ifdef TESTSTANDESP32
+  #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
   EEPROM.begin(512);
   #endif
   for ( i = 0; i < sizeof(config); i++ ) {
     *((char*)&config + i) = EEPROM.read(CONFIG_START + i);
   }
-  #ifdef TESTSTANDESP32
+  #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
   EEPROM.end();
   #endif
   if ( config.cksum != CheckSumConf(config) ) {
@@ -45,7 +48,7 @@ bool readTestStandConfig() {
   write the config received by the console
 
 */
-bool writeTestStandConfig( char *p ) {
+/*bool writeTestStandConfig( char *p ) {
 
   char *str;
   int i = 0;
@@ -100,19 +103,34 @@ bool writeTestStandConfig( char *p ) {
       case 11:
         config.telemetryType = atoi(str);
         strcat(msg, str);
-        break;  
+        break;
+      #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3    
+      case 12:
+        config.pressure_sensor_type2 = atoi(str);
+        strcat(msg, str);
+        break;
+      case 13:
+        //our checksum
+        strChk= atoi(str);
+        break;
+      #else
       case 12:
         //our checksum
         strChk= atoi(str);
         break;
+      #endif
     }
     i++;
 
   }
   //we have a partial config
+  #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3 
+  if (i<12)
+    return false;
+  #else
   if (i<11)
     return false;
-
+  #endif
   if(msgChk(msg, sizeof(msg)) != strChk)
     return false;  
   // add checksum
@@ -121,7 +139,7 @@ bool writeTestStandConfig( char *p ) {
   writeConfigStruc();
   return true;
 }
-
+*/
 bool writeTestStandConfigV2( char *p ) {
 
   char *str;
@@ -190,6 +208,11 @@ bool writeTestStandConfigV2( char *p ) {
       case 11:
         config.telemetryType = (int)commandVal;
         break;    
+      #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+      case 12:
+        config.pressure_sensor_type2 = (int)commandVal;
+        break;
+      #endif
     }
 
   // add checksum
@@ -205,13 +228,13 @@ bool writeTestStandConfigV2( char *p ) {
 void writeConfigStruc()
 {
   int i;
-  #ifdef TESTSTANDESP32
+  #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
   EEPROM.begin(512);
   #endif
   for ( i = 0; i < sizeof(config); i++ ) {
     EEPROM.write(CONFIG_START + i, *((char*)&config + i));
   }
-  #ifdef TESTSTANDESP32
+  #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
   EEPROM.commit();
   EEPROM.end();
   #endif
@@ -275,13 +298,17 @@ void printTestStandConfig()
 
   sprintf(temp, "%i,",config.telemetryType);
   strcat(testStandConfig, temp);
-  
+
+  #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+  sprintf(temp, "%i,",config.pressure_sensor_type2);
+  strcat(testStandConfig, temp);
+  #endif
   unsigned int chk = 0;
   chk = msgChk( testStandConfig, sizeof(testStandConfig) );
   sprintf(temp, "%i;\n", chk);
   strcat(testStandConfig, temp);
 
-  #ifdef TESTSTANDESP32
+  #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
   Serial.print("$");
   Serial.print(testStandConfig);
   #endif

@@ -146,7 +146,7 @@ int logger_I2C_eeprom::printThrustCurveList()
   {
     if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
       break;
-    #ifdef TESTSTANDESP32
+    #if defined TESTSTANDESP32 || defined TESTSTANDESP32V2
     Serial.print("ThrustCurve Nbr: ");
     Serial.println(i);
     Serial.print("Start: ");
@@ -199,12 +199,23 @@ long logger_I2C_eeprom::getThrustCurveData()
 {
   return _ThrustCurveData.thrust;
 }
-#if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32
+#if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32 || defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
 long logger_I2C_eeprom::getPressureCurveData()
 {
   return _ThrustCurveData.casing_pressure;
 }
 void logger_I2C_eeprom::setPressureCurveData( long pressure)
+{
+  _ThrustCurveData.casing_pressure = pressure;
+}
+#endif
+
+#if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+long logger_I2C_eeprom::getPressureCurveData2()
+{
+  return _ThrustCurveData.casing_pressure;
+}
+void logger_I2C_eeprom::setPressureCurveData2( long pressure)
 {
   _ThrustCurveData.casing_pressure = pressure;
 }
@@ -243,15 +254,19 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       sprintf(temp, "%i,", (int)getThrustCurveData() );
       //sprintf(temp, "%lu,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
-      #if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32
+      #if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32 || defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
       sprintf(temp, "%i,", (int)getPressureCurveData() );
+      strcat(ThrustCurveData, temp);
+      #endif
+      #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+      sprintf(temp, "%i,", (int)getPressureCurveData2() );
       strcat(ThrustCurveData, temp);
       #endif
       unsigned int chk = msgChk(ThrustCurveData, sizeof(ThrustCurveData));
       sprintf(temp, "%i", chk);
       strcat(ThrustCurveData, temp);
       strcat(ThrustCurveData, ";\n");
-      #ifdef TESTSTANDESP32
+      #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
       Serial.print("$");
       Serial.print(ThrustCurveData);
       #endif

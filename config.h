@@ -18,9 +18,12 @@
 // if you have the STM32 shield then define TESTSTANDSTM32
 //#define TESTSTANDSTM32
 //#define TESTSTANDSTM32V2
+//#define TESTSTANDSTM32V3 //use the 2 analog inputs to measure pressure
 
 // if you have the esp32 version
-#define TESTSTANDESP32
+//#define TESTSTANDESP32
+#define TESTSTANDESP32V3 //use the 2 analog inputs to measure pressure
+
 
 #ifdef TESTSTANDSTM32
 #define BOARD_FIRMWARE "TestStandSTM32"
@@ -28,12 +31,17 @@
 #ifdef TESTSTANDSTM32V2
 #define BOARD_FIRMWARE "TestStandSTM32V2"
 #endif
+#ifdef TESTSTANDSTM32V3
+#define BOARD_FIRMWARE "TestStandSTM32V3"
+#endif
 #ifdef TESTSTAND
 #define BOARD_FIRMWARE "TestStand"
 #endif
 #ifdef TESTSTANDESP32
 #define BOARD_FIRMWARE "TestStandESP32"
-//#define BOARD_FIRMWARE "TestStandSTM32V2"
+#endif
+#ifdef TESTSTANDESP32V3
+#define BOARD_FIRMWARE "TestStandESP32V3"
 #endif
 
 // If you want to have additionnal debugging uncomment it
@@ -52,33 +60,23 @@
 //////////// do not change anything after unless you know what you are doing /////////////////////
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 5
+#define MINOR_VERSION 6
 #define BUILD 1
 #define CONFIG_START 32
 
-#ifdef TESTSTANDSTM32
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2 || defined TESTSTANDSTM32V3
 #include <itoa.h>
 #endif
 
-#ifdef TESTSTANDSTM32V2
-#include <itoa.h>
-#endif
-
-#ifdef TESTSTANDESP32
-//#include <itoa.h>
-#endif
-
-#ifdef TESTSTANDSTM32 
+#if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2 || defined TESTSTANDSTM32V3 
 #define SerialCom Serial1
 #endif
-#ifdef TESTSTANDSTM32V2
-#define SerialCom Serial1
-#endif
+
 #ifdef TESTSTAND
 #define SerialCom Serial
 #endif
 
-#ifdef TESTSTANDESP32
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
 #include "BluetoothSerial.h"
 extern BluetoothSerial SerialBT;
 #define SerialCom SerialBT
@@ -100,8 +98,11 @@ struct ConfigStruct {
   int batteryType; // 0= Unknown, 1= "2S (7.4 Volts)", 2 = "9 Volts",3 = "3S (11.1 Volts)
   long calibration_factor;
   long current_offset;
-  int pressure_sensor_type; //0 = none 
+  int pressure_sensor_type; //0 = none  
   int telemetryType;
+  #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+  int pressure_sensor_type2; //0 = none
+  #endif
   int cksum;  
 };
 extern ConfigStruct config;
@@ -109,7 +110,6 @@ extern ConfigStruct config;
 extern void defaultConfig();
 extern bool readTestStandConfig();
 extern int getOutPin(int );
-//extern bool writeTestStandConfig( char * );
 extern bool writeTestStandConfigV2( char * );
 extern void printTestStandConfig();
 extern void writeConfigStruc();
