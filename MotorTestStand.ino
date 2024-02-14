@@ -187,7 +187,7 @@ long ReadThrust() {
    
 }
 
-#if defined(TESTSTANDSTM32V2) || defined(TESTSTANDSTM32V3)
+#if defined TESTSTANDSTM32V2 || defined TESTSTANDSTM32V3
 long ReadPressure() {
 
   float sum = 0;
@@ -204,7 +204,7 @@ long ReadPressure() {
   return (long)  (sum / 20.0);
 }
 #endif
-#if defined(TESTSTANDSTM32V3) 
+#if defined TESTSTANDSTM32V3  
 long ReadPressure2() {
 
   float sum = 0;
@@ -481,7 +481,9 @@ void recordThrust()
     //read current thrust
     currThrust = (ReadThrust() - initialThrust);
     currPressure = ReadPressure();
-
+    #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+    currPressure2 = ReadPressure2();
+    #endif
     //if (( currThrust > config.startRecordThrust) && !recording )
     if ( !recording )
     {
@@ -506,7 +508,7 @@ void recordThrust()
     }
     unsigned long prevTime = 0;
 
-    // loop until we have reach a thrust of of x kg
+    // loop until we have reach a thrust of x kg
     while (recording)
     {
       unsigned long currentTime;
@@ -557,10 +559,10 @@ void recordThrust()
           //SerialCom.print(currentMemaddress);
           SendTelemetry(millis() - initialTime, 100 );
 
-          if (currThrust < 100000) {
+          //if (currThrust < 100000) {
             currentMemaddress = logger.writeFastThrustCurve(currentMemaddress);
             currentMemaddress++;
-          }
+          //}
         }
 #if defined TESTSTANDSTM32 || defined TESTSTANDSTM32V2 || defined TESTSTAND || defined TESTSTANDSTM32V3 
         if (config.standResolution == 3)
@@ -632,7 +634,9 @@ void MainMenu()
     {
       currThrust = (ReadThrust() - initialThrust);
       currPressure = ReadPressure();
-      
+      #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+      currPressure2 = ReadPressure2();
+      #endif
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
       

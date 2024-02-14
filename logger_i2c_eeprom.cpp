@@ -146,7 +146,7 @@ int logger_I2C_eeprom::printThrustCurveList()
   {
     if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
       break;
-    #if defined TESTSTANDESP32 || defined TESTSTANDESP32V2
+    #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
     Serial.print("ThrustCurve Nbr: ");
     Serial.println(i);
     Serial.print("Start: ");
@@ -213,11 +213,11 @@ void logger_I2C_eeprom::setPressureCurveData( long pressure)
 #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
 long logger_I2C_eeprom::getPressureCurveData2()
 {
-  return _ThrustCurveData.casing_pressure;
+  return _ThrustCurveData.casing_pressure2;
 }
 void logger_I2C_eeprom::setPressureCurveData2( long pressure)
 {
-  _ThrustCurveData.casing_pressure = pressure;
+  _ThrustCurveData.casing_pressure2 = pressure;
 }
 #endif
 

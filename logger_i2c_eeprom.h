@@ -24,7 +24,7 @@ struct ThrustCurveDataStruct {
   #endif
 
   #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
-  long pressure2;
+  long casing_pressure2;
   #endif
 };
 struct ThrustCurveConfigStruct {
