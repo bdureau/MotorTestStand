@@ -1,6 +1,7 @@
 #include "logger_i2c_eeprom.h"
 #include "IC2extEEPROM.h"
 extEEPROM eep(kbits_512, 1, 64);
+
 logger_I2C_eeprom::logger_I2C_eeprom(uint8_t deviceAddress)
 {
 }
@@ -9,6 +10,7 @@ void logger_I2C_eeprom::begin()
 {
   Wire.begin();
 }
+
 /*
    clearThrustCurveList()
    Clear the Thrust Curve list. Rather than clearing the entire eeprom
@@ -88,18 +90,18 @@ int logger_I2C_eeprom::getLastThrustCurveNbr()
 
 /*
 
- eraseLastThrustCurve()
- 
- */
-bool logger_I2C_eeprom::eraseLastThrustCurve(){
-int i;
+  eraseLastThrustCurve()
+
+*/
+bool logger_I2C_eeprom::eraseLastThrustCurve() {
+  int i;
   for (i = 0; i < 25; i++)
   {
     if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
     {
-      if(i>0) {
-        _ThrustCurveConfig[i-1].ThrustCurve_start = 0;
-        _ThrustCurveConfig[i-1].ThrustCurve_stop = 0;
+      if (i > 0) {
+        _ThrustCurveConfig[i - 1].ThrustCurve_start = 0;
+        _ThrustCurveConfig[i - 1].ThrustCurve_stop = 0;
         writeThrustCurveList();
         return true;
       }
@@ -146,14 +148,14 @@ int logger_I2C_eeprom::printThrustCurveList()
   {
     if (_ThrustCurveConfig[i].ThrustCurve_start == 0)
       break;
-    #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
     Serial.print("ThrustCurve Nbr: ");
     Serial.println(i);
     Serial.print("Start: ");
     Serial.println(_ThrustCurveConfig[i].ThrustCurve_start);
     Serial.print("End: ");
     Serial.println(_ThrustCurveConfig[i].ThrustCurve_stop);
-    #endif
+#endif
     SerialCom.print("ThrustCurve Nbr: ");
     SerialCom.println(i);
     SerialCom.print("Start: ");
@@ -219,6 +221,14 @@ void logger_I2C_eeprom::setPressureCurveData2( long pressure)
 {
   _ThrustCurveData.casing_pressure2 = pressure;
 }
+long logger_I2C_eeprom::getThrustCurveDataFiltered()
+{
+  return _ThrustCurveData.thrust_filtered;
+}
+void logger_I2C_eeprom::setThrustCurveDataFiltered( long thrust)
+{
+  _ThrustCurveData.thrust_filtered = thrust;
+}
 #endif
 
 long logger_I2C_eeprom::getSizeOfThrustCurveData()
@@ -252,39 +262,39 @@ void logger_I2C_eeprom::printThrustCurveData(int ThrustCurveNbr)
       //sprintf(temp, "%lu,", currentTime );
       strcat(ThrustCurveData, temp);
       sprintf(temp, "%i,", (int)getThrustCurveData() );
-      //sprintf(temp, "%lu,", getThrustCurveData() );
       strcat(ThrustCurveData, temp);
-      #if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32 || defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+#if defined TESTSTANDSTM32V2 || defined TESTSTANDESP32 || defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
       sprintf(temp, "%i,", (int)getPressureCurveData() );
       strcat(ThrustCurveData, temp);
-      #endif
-      #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
+#endif
+#if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
       sprintf(temp, "%i,", (int)getPressureCurveData2() );
       strcat(ThrustCurveData, temp);
-      #endif
+      sprintf(temp, "%i,", (int)getThrustCurveDataFiltered() );
+      strcat(ThrustCurveData, temp);
+#endif
       unsigned int chk = msgChk(ThrustCurveData, sizeof(ThrustCurveData));
       sprintf(temp, "%i", chk);
       strcat(ThrustCurveData, temp);
       strcat(ThrustCurveData, ";\n");
-      #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
       Serial.print("$");
       Serial.print(ThrustCurveData);
-      #endif
+#endif
       SerialCom.print("$");
       SerialCom.print(ThrustCurveData);
 
       //This will slow down the data
       // this is for telemetry modules without enought buffer
-      if (config.telemetryType == 0) 
+      if (config.telemetryType == 0)
         delay(0);
-      else if (config.telemetryType == 1)  
-        delay(20); 
+      else if (config.telemetryType == 1)
+        delay(20);
       else if (config.telemetryType == 2)
         delay(50);
       else if (config.telemetryType == 3)
         delay(100);
     }
-
   }
 }
 /*
@@ -320,18 +330,18 @@ long logger_I2C_eeprom::checkMemoryErrors(long memoryLastAddress) {
     //read byte and save it
     byte currentByte;
     eep.read(i, ((byte*)&currentByte), sizeof(byte));
-    
-    //write byte 
-    byte bToWrite = ~currentByte; 
+
+    //write byte
+    byte bToWrite = ~currentByte;
     eep.write(i, ((byte*)&bToWrite), sizeof(currentByte));
     delay(5);
     //check if value is the same
     byte myByte;
     eep.read(i, ((byte*)&myByte), sizeof(byte));
     // if not the same add an error
-    if(myByte != bToWrite)
+    if (myByte != bToWrite)
       errors++;
-      
+
     //restore previous value
     eep.write(i, ((byte*)&currentByte), sizeof(currentByte));
     delay(5);
@@ -341,48 +351,48 @@ long logger_I2C_eeprom::checkMemoryErrors(long memoryLastAddress) {
 
 // this will check the memory size
 int logger_I2C_eeprom::checkMemorySize() {
-  int memSize=0;
+  int memSize = 0;
 
   // check for 4093 = 32K
   if (checkWrite(4093))
-      memSize = 32;
+    memSize = 32;
   // check for 8187 = 64 K
   if (checkWrite(8187))
-      memSize = 64;
+    memSize = 64;
   // check for 16375 = 128k
   if (checkWrite(16375))
-      memSize = 128;
+    memSize = 128;
   // check for 32750 = 256K
   if (checkWrite(32750))
-      memSize = 256;
+    memSize = 256;
   // check for 65500=512K
   if (checkWrite(65500))
-      memSize = 512;
+    memSize = 512;
   return memSize;
 }
 
 bool logger_I2C_eeprom::checkWrite(long address) {
-    bool ok = false;
-   //read byte and save it
-    byte currentByte;
-    eep.read(address, ((byte*)&currentByte), sizeof(byte));
-    SerialCom.print("currentByte:");
-    SerialCom.println(currentByte);
-    //write byte 
-    byte bToWrite = ~currentByte; 
-    eep.write(address, ((byte*)&bToWrite), sizeof(currentByte));
-    SerialCom.print("bToWrite:");
-    SerialCom.println(bToWrite);
-    delay(5);
-    //check if value is the same
-    byte myByte;
-    eep.read(address, ((byte*)&myByte), sizeof(byte));
-    SerialCom.print("myByte:");
-    SerialCom.println(myByte);
-    if(myByte == bToWrite)
-      ok = true;
-    //restore previous value
-    eep.write(address, ((byte*)&currentByte), sizeof(currentByte));
-    delay(5);  
-    return ok;
+  bool ok = false;
+  //read byte and save it
+  byte currentByte;
+  eep.read(address, ((byte*)&currentByte), sizeof(byte));
+  SerialCom.print("currentByte:");
+  SerialCom.println(currentByte);
+  //write byte
+  byte bToWrite = ~currentByte;
+  eep.write(address, ((byte*)&bToWrite), sizeof(currentByte));
+  SerialCom.print("bToWrite:");
+  SerialCom.println(bToWrite);
+  delay(5);
+  //check if value is the same
+  byte myByte;
+  eep.read(address, ((byte*)&myByte), sizeof(byte));
+  SerialCom.print("myByte:");
+  SerialCom.println(myByte);
+  if (myByte == bToWrite)
+    ok = true;
+  //restore previous value
+  eep.write(address, ((byte*)&currentByte), sizeof(currentByte));
+  delay(5);
+  return ok;
 }

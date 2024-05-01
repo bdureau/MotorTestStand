@@ -25,8 +25,11 @@ struct ThrustCurveDataStruct {
 
   #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
   long casing_pressure2;
+  long thrust_filtered;
   #endif
 };
+
+
 struct ThrustCurveConfigStruct {
   long ThrustCurve_start;    
   long ThrustCurve_stop; 
@@ -72,6 +75,8 @@ public:
     #if defined TESTSTANDSTM32V3 || defined TESTSTANDESP32V3
     long getPressureCurveData2();
     void setPressureCurveData2( long pressure);
+    void setThrustCurveDataFiltered( long thrust);
+    long getThrustCurveDataFiltered();
     #endif
     long getThrustCurveStart(int ThrustCurveNbr);
     long getThrustCurveStop(int ThrustCurveNbr);
@@ -82,8 +87,7 @@ public:
     boolean CanRecord();
     unsigned long writeFastThrustCurve(unsigned long eeaddress);
     long getSizeOfThrustCurveData();
-    long getLastThrustCurveEndAddress();
-    
+    long getLastThrustCurveEndAddress();   
     
 private: 
     ThrustCurveConfigStruct _ThrustCurveConfig[25];

@@ -60,7 +60,7 @@
 //////////// do not change anything after unless you know what you are doing /////////////////////
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 6
+#define MINOR_VERSION 7
 #define BUILD 1
 #define CONFIG_START 32
 
