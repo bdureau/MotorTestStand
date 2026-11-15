@@ -141,7 +141,13 @@ float BHX711::read()
   {
     //  delayMicroSeconds(1) needed for fast processors?
     digitalWrite(_clockPin, HIGH);
+    //#ifdef ESP_H
+    //delayMicroseconds(1);
+    //#endif
     digitalWrite(_clockPin, LOW);
+    //#ifdef ESP_H
+    //delayMicroseconds(1);
+    //#endif
     m--;
   }
 

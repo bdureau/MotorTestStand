@@ -17,7 +17,7 @@ const int pinSpeaker = PA0;
 #endif
 
 
-#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
 const int pinSpeaker = 4;
 #endif
 int beepingFrequency =440;
