@@ -51,3 +51,4 @@ for ESP32
 
 #define TESTSTANDESP32
 
+<img src="/board images/teststand compile options.png" width="49%">  
