@@ -1,16 +1,13 @@
 /*
-  Rocket Motor test stand ver 1.9
+  Rocket Motor test stand ver 1.10
   Copyright Boris du Reau 2012-2026
 
   The following is a datalogger for logging rocket motor thrustcurves.
 
   The code works with different boards, you need to adjust the config.h file to reflect your board.
 
-
   This is using a scale load cell as the sensor, a HX711 as the cell amplifier and an Atmega 328 or an STM32
   The following record the motor thrustcurve and saves it in an EEPROM
-
-
 
   For the EEPROM 24LC512-I/P - SERIAL EEPROM 512K,24LC512, DIP8
 
@@ -25,7 +22,6 @@
   8       VCC    (+3v3 ... +5V0)
 
   The time to write in the EEPROM is 10ms
-
 
   Major changes on version 1.0
   Initial version. This is based on my datalogger code and uses the same principles
@@ -49,6 +45,14 @@
   Added ability to rename the bluetooth for ESP32
   Major Changes on version 1.9
   Added ability to save the flight on the ESP32 board rather than the eeprom
+  Major Changes on version 1.10
+  ESP32 sampling rate improvements (all ESP32 versions):
+  - Analog inputs are now read with analogReadMilliVolts() (factory calibrated ADC)
+    using a fast oversampling without delay, replacing the 40 x delay(1) polynomial
+    correction that was taking ~40 ms per measurement
+  - The battery voltage is no longer read inside the recording loop, a cached value
+    is sent in the telemetry
+  - Fixed ReadPressure2() that was using the first pressure sensor type
 */
 
 //Test Stand configuration lib
@@ -161,6 +165,12 @@ long lastTelemetry = 0;
 long lastBattWarning = 0;
 boolean recording = false;
 
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
+// cached battery voltage (Volts), refreshed outside of the recording loop only
+float batteryVoltage = 0.0;
+unsigned long lastBatteryRead = 0;
+#endif
+
 
 void MainMenu();
 /*
@@ -255,28 +265,65 @@ long ReadPressure2() {
 #endif
 
 #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
-long ReadPressure() {
+/*
+   analogReadMilliVoltsAvg(pin)
+   Fast oversampled analog read for the ESP32.
+   analogReadMilliVolts() uses the ADC factory calibration (eFuse) so no polynomial
+   correction is needed anymore. Samples are taken back to back without any delay
+   so that a measurement takes well under 1 ms.
+   Returns the voltage at the pin in millivolts.
+*/
+float analogReadMilliVoltsAvg(uint8_t pinNumber) {
+  uint32_t sum = 0;
+  for (int i = 0; i < ESP32_ADC_OVERSAMPLING; i++) {
+    sum += analogReadMilliVolts(pinNumber);
+  }
+  return (float)sum / (float)ESP32_ADC_OVERSAMPLING;
+}
 
-  int pressure = analogReadAdjusted(pressurePin);
-  long mapped_pressure = (long)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
-                         0.5,
-                         4.5,
-                         0.0,
-                         (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-  return mapped_pressure;
+/*
+   pressureFromMilliVolts(milliVolts, sensorType)
+   Convert the voltage measured at the pin into a pressure (PSI).
+   The 0.5V-4.5V sensor output goes through the voltage divider before the ADC.
+*/
+long pressureFromMilliVolts(float milliVolts, int sensorType) {
+  return (long)map_tofloat( (milliVolts / 1000.0f / VOLT_DIVIDER_PRESSURE),
+                            0.5,
+                            4.5,
+                            0.0,
+                            (float)pressureSensorTypeToMaxValue(sensorType));
+}
+
+long ReadPressure() {
+  return pressureFromMilliVolts(analogReadMilliVoltsAvg(pressurePin), config.pressure_sensor_type);
+}
+
+/*
+   readBatteryVoltage()
+   Read the battery voltage (Volts) and refresh the cached value.
+   This must NOT be called in the recording loop, use batteryVoltage instead.
+*/
+float readBatteryVoltage() {
+  batteryVoltage = VOLT_DIVIDER * (analogReadMilliVoltsAvg(2) / 1000.0f);
+  lastBatteryRead = millis();
+  return batteryVoltage;
+}
+
+/*
+   updateBatteryVoltage()
+   Refresh the cached battery voltage at most every ESP32_BATTERY_READ_INTERVAL ms.
+   Does nothing while recording so that the sampling rate is not affected.
+*/
+void updateBatteryVoltage() {
+  if (!recording && (millis() - lastBatteryRead) > ESP32_BATTERY_READ_INTERVAL)
+    readBatteryVoltage();
 }
 #endif
 
 #if defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
 long ReadPressure2() {
-
-  int pressure = analogReadAdjusted(pressurePin2);
-  long mapped_pressure = (long)map_tofloat( ((float)(pressure * 3300) / (float)4096000 / VOLT_DIVIDER_PRESSURE),
-                         0.5,
-                         4.5,
-                         0.0,
-                         (float)pressureSensorTypeToMaxValue(config.pressure_sensor_type));
-  return mapped_pressure;
+  // use the second sensor type (version 1.9 was wrongly using pressure_sensor_type)
+  return pressureFromMilliVolts(analogReadMilliVoltsAvg(pressurePin2), config.pressure_sensor_type2);
 }
 #endif
 
@@ -321,6 +368,15 @@ void setup()
 #if defined TESTSTANDSTM32V2 || defined TESTSTANDSTM32V3
   pinMode(PA7, INPUT_ANALOG);
   analogReadResolution(12); //// need to review !!!!
+#endif
+
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
+  // 12 bits ADC with 11dB attenuation (full range) on all the analog inputs.
+  // analogReadMilliVolts() takes the attenuation into account.
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+  // first battery reading so that the telemetry has a valid value
+  readBatteryVoltage();
 #endif
 
   //You can change the baud rate here
@@ -473,9 +529,8 @@ void SendTelemetry(long sampleTime, int freq) {
 #endif
 
 #if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
-    int batVoltage = analogReadAdjusted(2);
-    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
-    dtostrf(bat, 4, 2, temp);
+    // cached value: reading the battery here was costing ~40 ms per frame while recording
+    dtostrf(batteryVoltage, 4, 2, temp);
     strcat(testStandTelem, temp);
     strcat(testStandTelem, ",");
 #endif
@@ -720,6 +775,10 @@ void MainMenu()
       if (recording)
         SendTelemetry(millis() - initialTime, 200);
 
+#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
+      // refresh the cached battery voltage (rate limited, never while recording)
+      updateBatteryVoltage();
+#endif
       startState = digitalRead(startPin);
 
       if (startState == HIGH)
@@ -1166,7 +1225,6 @@ void interpretCommandBuffer(char *commandbuffer) {
   }
   else if (commandbuffer[0] == 'z')
   {
-//#ifdef TELEMETRY_ESP32
     updateTestStandName(commandbuffer);
 #ifdef TELEMETRY_ESP32
     Serial.print(F("$OK;\n"));
@@ -1283,9 +1341,8 @@ void checkBatVoltage(float minVolt) {
   if ((millis() - lastBattWarning) > 10000) {
     lastBattWarning = millis();
 
-    double batVoltage = analogReadAdjusted(2);
-
-    float bat = VOLT_DIVIDER * ((float)(batVoltage * 3300) / (float)4096000);
+    // fresh reading, checkBatVoltage() is only called outside of the recording loop
+    float bat = readBatteryVoltage();
 
     if (bat < minVolt) {
       for (int i = 0; i < 10; i++)
@@ -1398,55 +1455,6 @@ int pressureSensorTypeToMaxValue( int type) {
   return maxValue;
 }
 
-#if defined TESTSTANDESP32 || defined TESTSTANDESP32V3 || defined TESTSTANDESP32V4
-double analogReadAdjusted(byte pinNumber) {
-
-  // Specify the adjustment factors.
-  const double f1 = 1.7111361460487501e+001;
-  const double f2 = 4.2319467860421662e+000;
-  const double f3 = -1.9077375643188468e-002;
-  const double f4 = 5.4338055402459246e-005;
-  const double f5 = -8.7712931081088873e-008;
-  const double f6 = 8.7526709101221588e-011;
-  const double f7 = -5.6536248553232152e-014;
-  const double f8 = 2.4073049082147032e-017;
-  const double f9 = -6.7106284580950781e-021;
-  const double f10 = 1.1781963823253708e-024;
-  const double f11 = -1.1818752813719799e-028;
-  const double f12 = 5.1642864552256602e-033;
-
-  // Specify the number of loops for one measurement.
-  const int loops = 40;
-
-  // Specify the delay between the loops.
-  const int loopDelay = 1;
-
-  // Initialize the used variables.
-  int counter = 1;
-  int inputValue = 0;
-  double totalInputValue = 0;
-  double averageInputValue = 0;
-
-  // Loop to get the average of different analog values.
-  for (counter = 1; counter <= loops; counter++) {
-
-    // Read the analog value.
-    inputValue = analogRead(pinNumber);
-
-    // Add the analog value to the total.
-    totalInputValue += inputValue;
-
-    // Wait some time after each loop.
-    delay(loopDelay);
-  }
-
-  // Calculate the average input value.
-  averageInputValue = totalInputValue / loops;
-
-  // Calculate and return the adjusted input value.
-  return f1 + f2 * pow(averageInputValue, 1) + f3 * pow(averageInputValue, 2) + f4 * pow(averageInputValue, 3) + f5 * pow(averageInputValue, 4) + f6 * pow(averageInputValue, 5) + f7 * pow(averageInputValue, 6) + f8 * pow(averageInputValue, 7) + f9 * pow(averageInputValue, 8) + f10 * pow(averageInputValue, 9) + f11 * pow(averageInputValue, 10) + f12 * pow(averageInputValue, 11);
-}
-#endif
 /*int checkMemoryErrors(int memorySize) {
   int errors = 0;
 
